@@ -1,0 +1,7 @@
+caveclient==8.2.1
+ipykernel==7.3.0
+jupyterlab==4.6.4
+matplotlib==3.11.2
+pandas==2.3.3
+pyarrow==25.0.1
+scipy==1.18.1
