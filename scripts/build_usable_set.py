@@ -1,4 +1,4 @@
-"""Session 2: finalize the usable set for the like-to-like baseline.
+"""Sessions 2-3: finalize the usable set for the like-to-like baseline.
 
 Run from the repo root: `.venv/bin/python scripts/build_usable_set.py`
 Needs the Session 1 parquets in data/ (notebooks/01_setup_and_explore.py).
@@ -7,12 +7,14 @@ Pipeline (main):
   start       Session 1 set: proofread (dendrite >= clean) + in coregistration_manual_v4 (1,059),
               current (v1822) root ids, v661 labels + aibs_metamodel_celltypes_v661_corrections
   excitatory  classification_system == excitatory_neuron (after corrections)
-  match       drop score < 0 matches; per neuron keep the single best-fit match
-              (lowest residual, ties -> higher score); record the chosen scan
-  joined      inner join digital_twin_properties_bcm_coreg_v4 on session/scan_idx/unit_id
+  match       drop score < 0 matches
+  joined      keep matches with a row in digital_twin_properties_bcm_coreg_v4 (session/scan_idx/unit_id);
+              per neuron keep the one with the highest cc_max (ties -> higher score) (Session 3 rule);
+              record the chosen scan
   quality     cc_abs > 0.2 and cc_max > 0.4 (Ding et al. 2025)
 
-Sensitivity (supplement): Ding match rule (residual < 20, score > -10); no quality filter.
+Sensitivity (supplement): lowest-residual multi-match rule (Session 2); Ding match rule
+(residual < 20, score > -10); no quality filter.
 """
 import sys
 from pathlib import Path
@@ -96,25 +98,38 @@ FUNC_COLS = ["OSI", "DSI", "gOSI", "gDSI", "pref_ori", "pref_dir", "readout_loc_
              "cc_abs", "cc_max", "cc_norm"]
 
 
-def pick_best(matches):
-    """One row per neuron: lowest residual, ties broken by higher score."""
-    m = matches.sort_values(["pt_root_id", "residual", "score"], ascending=[True, True, False])
+def pick_best(matches, by):
+    """One row per neuron, best by `by` = [(column, ascending), ...]; ties fall through the list."""
+    cols, asc = zip(*by)
+    m = matches.sort_values(["pt_root_id", *cols], ascending=[True, *asc])
     n = matches.groupby("pt_root_id").agg(n_matches=("unit_id", "size"),
                                           n_scans=("scan_idx", lambda s: matches.loc[s.index, ["session", "scan_idx"]].drop_duplicates().shape[0]))
     best = m.drop_duplicates("pt_root_id").set_index("pt_root_id").join(n).reset_index()
     best["chosen_scan"] = "s" + best["session"].astype(str) + "_scan" + best["scan_idx"].astype(str)
-    return best[["pt_root_id", *UNIT, "field", "residual", "score", "chosen_scan", "n_matches", "n_scans"]]
+    return best
 
 
-def run(match_rule, quality=True):
-    """Return {stage: neuron table} for one pipeline variant."""
+def run(match_rule, select="cc_max", quality=True):
+    """Return {stage: neuron table} for one pipeline variant.
+
+    select="cc_max"   (main) among passing matches with a DT row, highest cc_max (ties: higher score)
+    select="residual" (S2 rule) among passing matches, lowest residual (ties: higher score), then join DT
+    Stage counts are neurons: "match rules" = >= 1 passing match, "joined DT" = neuron has DT data
+    for its chosen match (cc_max) / its best-fit match (residual).
+    """
     stages = {"start": usable}
     exc = usable[usable["classification_system"] == "excitatory_neuron"]
     stages["excitatory"] = exc
     ok = coreg[coreg["pt_root_id"].isin(exc["pt_root_id"]) & match_rule(coreg)]
-    matched = exc.merge(pick_best(ok), on="pt_root_id")
-    stages["match rules"] = matched
-    joined = matched.merge(func[UNIT + FUNC_COLS], on=UNIT)
+    stages["match rules"] = exc[exc["pt_root_id"].isin(ok["pt_root_id"])]
+    keep = ["pt_root_id", *UNIT, "field", "residual", "score"]
+    if select == "cc_max":
+        ok_dt = ok[keep].merge(func[UNIT + FUNC_COLS], on=UNIT)
+        best = pick_best(ok_dt, [("cc_max", False), ("score", False)])
+    else:
+        best = pick_best(ok[keep], [("residual", True), ("score", False)])
+        best = best.merge(func[UNIT + FUNC_COLS], on=UNIT)
+    joined = exc.merge(best, on="pt_root_id")
     stages["joined DT"] = joined
     if quality:
         stages["quality"] = joined[(joined["cc_abs"] > CC_ABS_MIN) & (joined["cc_max"] > CC_MAX_MIN)]
@@ -123,20 +138,26 @@ def run(match_rule, quality=True):
 
 MAIN_RULE = lambda d: d["score"] >= 0                                  # noqa: E731
 DING_RULE = lambda d: (d["residual"] < 20) & (d["score"] > -10)        # noqa: E731
+MAIN = "main (score >= 0, max cc_max, QC)"
 variants = {
-    "main (score >= 0, QC)": run(MAIN_RULE),
-    "Ding match (residual < 20, score > -10), QC": run(DING_RULE),
-    "main match, no QC": run(MAIN_RULE, quality=False),
+    MAIN: run(MAIN_RULE),
+    "lowest residual (S2 rule), QC": run(MAIN_RULE, select="residual"),
+    "Ding match (residual < 20, score > -10), max cc_max, QC": run(DING_RULE),
+    "main, no QC": run(MAIN_RULE, quality=False),
+    "lowest residual, no QC": run(MAIN_RULE, select="residual", quality=False),
     "Ding match, no QC": run(DING_RULE, quality=False),
 }
-main = variants["main (score >= 0, QC)"]
+main = variants[MAIN]
 
-# Diagnostic: the best-fit match has no digital-twin row, but another passing match does.
-ok = coreg[coreg["pt_root_id"].isin(main["excitatory"]["pt_root_id"]) & MAIN_RULE(coreg)]
-has_dt = ok.merge(func[UNIT], on=UNIT)["pt_root_id"].unique()
-lost = set(main["match rules"]["pt_root_id"]) - set(main["joined DT"]["pt_root_id"])
-rescuable = lost & set(has_dt)
-print(f"Dropped at DT join: {len(lost)}; of these, {len(rescuable)} have another passing match with DT data\n")
+# How often the two multi-match rules pick different units (neurons in both final sets).
+a = main["quality"].set_index("pt_root_id")[UNIT]
+b = variants["lowest residual (S2 rule), QC"]["quality"].set_index("pt_root_id")[UNIT]
+both = a.index.intersection(b.index)
+n_diff = (a.loc[both] != b.loc[both]).any(axis=1).sum()
+multi = (main["quality"]["n_matches"] > 1).sum()
+rule_note = (f"Final-set neurons with >1 passing DT match: {multi}. Neurons in both the cc_max and "
+             f"lowest-residual final sets: {len(both)}; chosen unit differs for {n_diff}.")
+print(rule_note, "\n")
 
 # %% Counts tables
 lines = [f"# Session 2 counts (auto-generated by scripts/build_usable_set.py, v{VERSION})\n"]
@@ -158,7 +179,7 @@ lines += [full.T.to_markdown(), ""]
 
 lines.append("## Final set by axon level, sensitivity variants (supplement)\n")
 for v, st in variants.items():
-    if v.startswith("main (score"):
+    if v == MAIN:
         continue
     final = list(st.values())[-1]
     lines += [f"### {v} (n = {len(final):,})\n", celltype_by_axon(final).to_markdown(), ""]
@@ -167,7 +188,7 @@ lines.append("## Provenance\n")
 lines += ["Root ids changed since proofreading:\n", root_log.to_markdown(index=False), "",
           f"Cell-type corrections from `{CT_CORR}` (v{VERSION}) on proofread cells:\n",
           corr_log.to_markdown(index=False), "",
-          f"Best-fit match missing from DT, another passing match has DT: {len(rescuable)} of {len(lost)} dropped at join.\n"]
+          rule_note + "\n"]
 COUNTS_MD.write_text("\n".join(lines))
 print("\n".join(lines))
 

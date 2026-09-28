@@ -42,20 +42,72 @@
 | 6P-IT       |           2 |              27 |            1 |      2 |    32 |
 | **All**     |         244 |             581 |          106 |      9 |   940 |
 
-### joined DT (n = 775)
+### joined DT (n = 811)
 
 | cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
 |:------------|------------:|----------------:|-------------:|-------:|------:|
-| 23P         |          74 |             136 |           60 |      3 |   273 |
-| 4P          |          96 |             212 |           20 |      2 |   330 |
-| 5P-ET       |           4 |              19 |            6 |      1 |    30 |
+| 23P         |          80 |             149 |           62 |      3 |   294 |
+| 4P          |          96 |             223 |           20 |      2 |   341 |
+| 5P-ET       |           4 |              22 |            6 |      1 |    33 |
 | 5P-IT       |          23 |              57 |           13 |      0 |    93 |
 | 5P-NP       |           0 |               1 |            1 |      0 |     2 |
 | 6P-CT       |           0 |              17 |            1 |      0 |    18 |
-| 6P-IT       |           1 |              25 |            1 |      2 |    29 |
-| **All**     |         198 |             467 |          102 |      8 |   775 |
+| 6P-IT       |           1 |              26 |            1 |      2 |    30 |
+| **All**     |         204 |             495 |          104 |      8 |   811 |
 
-### quality (n = 662)
+### quality (n = 694)
+
+| cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
+|:------------|------------:|----------------:|-------------:|-------:|------:|
+| 23P         |          75 |             118 |           59 |      3 |   255 |
+| 4P          |          92 |             183 |           20 |      2 |   297 |
+| 5P-ET       |           3 |              19 |            6 |      1 |    29 |
+| 5P-IT       |          22 |              48 |           13 |      0 |    83 |
+| 5P-NP       |           0 |               1 |            1 |      0 |     2 |
+| 6P-CT       |           0 |              10 |            1 |      0 |    11 |
+| 6P-IT       |           1 |              13 |            1 |      2 |    17 |
+| **All**     |         193 |             392 |          101 |      8 |   694 |
+
+## Stage totals, all variants
+
+|                                                         |   start |   excitatory |   match rules |   joined DT |   quality |
+|:--------------------------------------------------------|--------:|-------------:|--------------:|------------:|----------:|
+| main (score >= 0, max cc_max, QC)                       |    1059 |         1058 |           940 |         811 |       694 |
+| lowest residual (S2 rule), QC                           |    1059 |         1058 |           940 |         775 |       662 |
+| Ding match (residual < 20, score > -10), max cc_max, QC |    1059 |         1058 |          1054 |         912 |       780 |
+| main, no QC                                             |    1059 |         1058 |           940 |         811 |           |
+| lowest residual, no QC                                  |    1059 |         1058 |           940 |         775 |           |
+| Ding match, no QC                                       |    1059 |         1058 |          1054 |         912 |           |
+
+## Fully extended axons surviving each stage, by cell type
+
+|                                                                       |   4P |   23P |   5P-IT |   5P-ET |   6P-IT |   **All** |
+|:----------------------------------------------------------------------|-----:|------:|--------:|--------:|--------:|----------:|
+| main (score >= 0, max cc_max, QC) / excitatory                        |  127 |   106 |      29 |      10 |       2 |       274 |
+| main (score >= 0, max cc_max, QC) / match rules                       |  114 |    92 |      27 |       9 |       2 |       244 |
+| main (score >= 0, max cc_max, QC) / joined DT                         |   96 |    80 |      23 |       4 |       1 |       204 |
+| main (score >= 0, max cc_max, QC) / quality                           |   92 |    75 |      22 |       3 |       1 |       193 |
+| lowest residual (S2 rule), QC / excitatory                            |  127 |   106 |      29 |      10 |       2 |       274 |
+| lowest residual (S2 rule), QC / match rules                           |  114 |    92 |      27 |       9 |       2 |       244 |
+| lowest residual (S2 rule), QC / joined DT                             |   96 |    74 |      23 |       4 |       1 |       198 |
+| lowest residual (S2 rule), QC / quality                               |   92 |    68 |      22 |       3 |       1 |       186 |
+| Ding match (residual < 20, score > -10), max cc_max, QC / excitatory  |  127 |   106 |      29 |      10 |       2 |       274 |
+| Ding match (residual < 20, score > -10), max cc_max, QC / match rules |  126 |   106 |      29 |      10 |       2 |       273 |
+| Ding match (residual < 20, score > -10), max cc_max, QC / joined DT   |  106 |    93 |      25 |       5 |       1 |       230 |
+| Ding match (residual < 20, score > -10), max cc_max, QC / quality     |  101 |    86 |      24 |       4 |       1 |       216 |
+| main, no QC / excitatory                                              |  127 |   106 |      29 |      10 |       2 |       274 |
+| main, no QC / match rules                                             |  114 |    92 |      27 |       9 |       2 |       244 |
+| main, no QC / joined DT                                               |   96 |    80 |      23 |       4 |       1 |       204 |
+| lowest residual, no QC / excitatory                                   |  127 |   106 |      29 |      10 |       2 |       274 |
+| lowest residual, no QC / match rules                                  |  114 |    92 |      27 |       9 |       2 |       244 |
+| lowest residual, no QC / joined DT                                    |   96 |    74 |      23 |       4 |       1 |       198 |
+| Ding match, no QC / excitatory                                        |  127 |   106 |      29 |      10 |       2 |       274 |
+| Ding match, no QC / match rules                                       |  126 |   106 |      29 |      10 |       2 |       273 |
+| Ding match, no QC / joined DT                                         |  106 |    93 |      25 |       5 |       1 |       230 |
+
+## Final set by axon level, sensitivity variants (supplement)
+
+### lowest residual (S2 rule), QC (n = 662)
 
 | cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
 |:------------|------------:|----------------:|-------------:|-------:|------:|
@@ -68,50 +120,33 @@
 | 6P-IT       |           1 |              12 |            1 |      2 |    16 |
 | **All**     |         186 |             369 |           99 |      8 |   662 |
 
-## Stage totals, all variants
-
-|                                             |   start |   excitatory |   match rules |   joined DT |   quality |
-|:--------------------------------------------|--------:|-------------:|--------------:|------------:|----------:|
-| main (score >= 0, QC)                       |    1059 |         1058 |           940 |         775 |       662 |
-| Ding match (residual < 20, score > -10), QC |    1059 |         1058 |          1054 |         868 |       737 |
-| main match, no QC                           |    1059 |         1058 |           940 |         775 |           |
-| Ding match, no QC                           |    1059 |         1058 |          1054 |         868 |           |
-
-## Fully extended axons surviving each stage, by cell type
-
-|                                                           |   4P |   23P |   5P-IT |   5P-ET |   6P-IT |   **All** |
-|:----------------------------------------------------------|-----:|------:|--------:|--------:|--------:|----------:|
-| main (score >= 0, QC) / excitatory                        |  127 |   106 |      29 |      10 |       2 |       274 |
-| main (score >= 0, QC) / match rules                       |  114 |    92 |      27 |       9 |       2 |       244 |
-| main (score >= 0, QC) / joined DT                         |   96 |    74 |      23 |       4 |       1 |       198 |
-| main (score >= 0, QC) / quality                           |   92 |    68 |      22 |       3 |       1 |       186 |
-| Ding match (residual < 20, score > -10), QC / excitatory  |  127 |   106 |      29 |      10 |       2 |       274 |
-| Ding match (residual < 20, score > -10), QC / match rules |  126 |   106 |      29 |      10 |       2 |       273 |
-| Ding match (residual < 20, score > -10), QC / joined DT   |  106 |    85 |      25 |       5 |       1 |       222 |
-| Ding match (residual < 20, score > -10), QC / quality     |  101 |    77 |      24 |       4 |       1 |       207 |
-| main match, no QC / excitatory                            |  127 |   106 |      29 |      10 |       2 |       274 |
-| main match, no QC / match rules                           |  114 |    92 |      27 |       9 |       2 |       244 |
-| main match, no QC / joined DT                             |   96 |    74 |      23 |       4 |       1 |       198 |
-| Ding match, no QC / excitatory                            |  127 |   106 |      29 |      10 |       2 |       274 |
-| Ding match, no QC / match rules                           |  126 |   106 |      29 |      10 |       2 |       273 |
-| Ding match, no QC / joined DT                             |  106 |    85 |      25 |       5 |       1 |       222 |
-
-## Final set by axon level, sensitivity variants (supplement)
-
-### Ding match (residual < 20, score > -10), QC (n = 737)
+### Ding match (residual < 20, score > -10), max cc_max, QC (n = 780)
 
 | cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
 |:------------|------------:|----------------:|-------------:|-------:|------:|
-| 23P         |          77 |             129 |           64 |      3 |   273 |
-| 4P          |         101 |             190 |           21 |      2 |   314 |
-| 5P-ET       |           4 |              16 |            7 |      1 |    28 |
+| 23P         |          86 |             141 |           68 |      3 |   298 |
+| 4P          |         101 |             204 |           21 |      2 |   328 |
+| 5P-ET       |           4 |              19 |            7 |      1 |    31 |
 | 5P-IT       |          24 |              54 |           13 |      0 |    91 |
 | 5P-NP       |           0 |               1 |            1 |      0 |     2 |
 | 6P-CT       |           0 |              11 |            1 |      0 |    12 |
-| 6P-IT       |           1 |              13 |            1 |      2 |    17 |
-| **All**     |         207 |             414 |          108 |      8 |   737 |
+| 6P-IT       |           1 |              14 |            1 |      2 |    18 |
+| **All**     |         216 |             444 |          112 |      8 |   780 |
 
-### main match, no QC (n = 775)
+### main, no QC (n = 811)
+
+| cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
+|:------------|------------:|----------------:|-------------:|-------:|------:|
+| 23P         |          80 |             149 |           62 |      3 |   294 |
+| 4P          |          96 |             223 |           20 |      2 |   341 |
+| 5P-ET       |           4 |              22 |            6 |      1 |    33 |
+| 5P-IT       |          23 |              57 |           13 |      0 |    93 |
+| 5P-NP       |           0 |               1 |            1 |      0 |     2 |
+| 6P-CT       |           0 |              17 |            1 |      0 |    18 |
+| 6P-IT       |           1 |              26 |            1 |      2 |    30 |
+| **All**     |         204 |             495 |          104 |      8 |   811 |
+
+### lowest residual, no QC (n = 775)
 
 | cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
 |:------------|------------:|----------------:|-------------:|-------:|------:|
@@ -124,18 +159,18 @@
 | 6P-IT       |           1 |              25 |            1 |      2 |    29 |
 | **All**     |         198 |             467 |          102 |      8 |   775 |
 
-### Ding match, no QC (n = 868)
+### Ding match, no QC (n = 912)
 
 | cell_type   |   fully_ext |   partially_ext |   interareal |   none |   All |
 |:------------|------------:|----------------:|-------------:|-------:|------:|
-| 23P         |          85 |             163 |           68 |      3 |   319 |
-| 4P          |         106 |             232 |           21 |      2 |   361 |
-| 5P-ET       |           5 |              19 |            7 |      1 |    32 |
+| 23P         |          93 |             179 |           72 |      3 |   347 |
+| 4P          |         106 |             244 |           21 |      2 |   373 |
+| 5P-ET       |           5 |              22 |            7 |      1 |    35 |
 | 5P-IT       |          25 |              63 |           13 |      0 |   101 |
 | 5P-NP       |           0 |               1 |            1 |      0 |     2 |
 | 6P-CT       |           0 |              21 |            1 |      1 |    23 |
-| 6P-IT       |           1 |              26 |            1 |      2 |    30 |
-| **All**     |         222 |             525 |          112 |      9 |   868 |
+| 6P-IT       |           1 |              27 |            1 |      2 |    31 |
+| **All**     |         230 |             557 |          116 |      9 |   912 |
 
 ## Provenance
 
@@ -157,4 +192,4 @@ Cell-type corrections from `aibs_metamodel_celltypes_v661_corrections` (v1822) o
 |       291083 | inhibitory_neuron       | NGC                   | 864691135839999379 | BPC              | False             |
 |       420681 | inhibitory_neuron       | BC                    | 864691136145537844 | NGC              | False             |
 
-Best-fit match missing from DT, another passing match has DT: 36 of 165 dropped at join.
+Final-set neurons with >1 passing DT match: 145. Neurons in both the cc_max and lowest-residual final sets: 660; chosen unit differs for 65.
