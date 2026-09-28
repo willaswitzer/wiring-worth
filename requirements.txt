@@ -6,3 +6,4 @@ pandas==2.3.3
 pyarrow==25.0.1
 scipy==1.18.1
 tabulate==0.10.0
+cloud-volume==12.15.0
