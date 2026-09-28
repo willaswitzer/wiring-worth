@@ -5,3 +5,4 @@ __pycache__/
 *.parquet
 .env
 .DS_Store
+.r-env/

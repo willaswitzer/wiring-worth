@@ -1,0 +1,13 @@
+# R environment for the like-to-like models (Session 5).
+# Create:  micromamba create -y -p ./.r-env -f r-environment.yml
+# Exact solved versions: r-environment.lock.txt (micromamba create -y -p ./.r-env --file r-environment.lock.txt)
+name: wiring-worth-r
+channels:
+  - conda-forge
+dependencies:
+  - r-base=4.5
+  - r-glmmtmb=1.1.14
+  - r-tmb=1.9.19  # the TMB version glmmTMB 1.1.14 was built against; newer TMB triggers an ABI-mismatch warning
+  - r-emmeans
+  - r-performance
+  - r-arrow
