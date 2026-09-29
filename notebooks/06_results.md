@@ -97,6 +97,8 @@ The three Ding et al. 2025 GLMMs, fitted with glmmTMB 1.1.14:
 | Nsyn/Ld | orientation | V1→V1 | −0.021 [−0.041, −0.001] | +0.004 [−0.022, +0.030] | 0.061 | 228 |
 | Nsyn/Ld | orientation | V1→HVA (FF) | −0.136 [−0.262, −0.010] | −0.032 [−0.164, +0.108] | 0.170 | 228 |
 
+The Ld p for orientation, V1→HVA changed from 0.306 (48 shuffles) to 0.545 (500 shuffles) because the 48-shuffle null mean (−0.011) was off by chance from the 500-shuffle mean (−0.005). The permutation p is centred on the null mean, so that shift moved it.
+
 ## Interpretation
 
 1. **The shuffled null is not centred on zero for RF distance.** In V1→V1 the shuffled slopes average −0.164 (Ld), −0.252 (Nsyn) and −0.094 (Nsyn/Ld).
@@ -107,8 +109,8 @@ The three Ding et al. 2025 GLMMs, fitted with glmmTMB 1.1.14:
    - Synapses per unit Ld (−0.096) is indistinguishable from the shuffle (−0.094, p = 0.95).
    - Neurons with nearby RFs have more axon–dendrite proximity, and hence more synapses. Given the proximity, they are not converted to synapses at a higher rate.
    - The same holds for Ld in V1→HVA and HVA→HVA.
-3. **Orientation is like-to-like in V1→V1 at every scale, weakest at the synaptic scale.**
-   - Ld: −0.018 per 10°, p = 0.006 (2 of 500 shuffles as extreme).
+3. **Orientation in V1→V1: small but significant effects on contact and synapse count, borderline at the synaptic scale.**
+   - Ld: −0.018 per 10°, p = 0.006 (2 of 500 shuffles as extreme). This is significant but small: about 2% less axon–dendrite contact per 10° of orientation difference (e^−0.018 = 0.982). It survives a Holm correction across the 5 Ld tests (adjusted p = 0.012).
    - Nsyn: −0.040, p = 0.004.
    - Nsyn/Ld: −0.021, p = 0.061. Adding soma distance gives p = 0.041, and extended dendrites only gives p = 0.083.
    - Per 10° of orientation difference, synapse count falls by about 4% (e^−0.040). Across the full 90° range that is about a 30% fall.
