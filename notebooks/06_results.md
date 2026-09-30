@@ -13,7 +13,7 @@ Run 2026-09-28 at v1822.
 - Figure: `figures/06_like_to_like.png` (main variant)
 - Raw fits and permutations: `data/like_to_like/` (not committed)
 
-**Runtime:** real fits took 2.7 min (18 variant × similarity × model combinations). The permutations took 75 min, plus a 126-min overnight run (4 workers) that took the main Ld models from 48 to 500 shuffles.
+**Runtime:** real fits took 2.7 min (18 variant × similarity × model combinations). The permutations took 75 min, plus a 126-min overnight run (4 workers) that took the main Ld models from 48 to 500 shuffles, and a 2026-09-29 run (`scripts/run_sensitivity_ld_500.sh`, 4 workers; 150 + 89 min) that took the soma-distance and extended-dendrite Ld models to 500.
 
 ## Data
 
@@ -70,12 +70,12 @@ The three Ding et al. 2025 GLMMs, fitted with glmmTMB 1.1.14:
 | variant | Nsyn and Nsyn/Ld models | Ld models (Tweedie) |
 |---|---:|---:|
 | main | 228 | 500 |
-| + soma distance | 96 | 20 |
-| extended dendrites only | 180 | 36 |
+| + soma distance | 96 | 500 |
+| extended dendrites only | 180 | 500 |
 
-**Why not 1,000:** each Tweedie Ld fit over 126k pairs takes about 30 s and peaks at 1.7 GB. On this 8 GB machine, with an unrelated 4 GB virtualization process running, only 2 of those fit at once. The Poisson models ran on 6 workers. The main Ld models were extended to 500 in a separate overnight run (`like_to_like.R perm main tweedie 500 240 4`, 126 min) once the virtualization process was gone.
+**Why not 1,000:** each Tweedie Ld fit over 126k pairs takes about 30 s and peaks at 1.7 GB. On this 8 GB machine, with an unrelated 4 GB virtualization process running, only 2 of those fit at once. The Poisson models ran on 6 workers. The main Ld models were extended to 500 in a separate overnight run (`like_to_like.R perm main tweedie 500 240 4`, 126 min) once the virtualization process was gone; the two sensitivity variants' Ld models were extended to 500 the same way (`scripts/run_sensitivity_ld_500.sh`).
 
-**Consequence:** the smallest attainable p is 1/501 = 0.002 for the main Ld models, 1/229 = 0.004 for the main Poisson models, and 1/21 = 0.048 and 1/37 = 0.027 for the soma-distance and extended-dendrite Ld models. A p at the floor means the real slope lay outside every shuffle.
+**Consequence:** the smallest attainable p is 1/501 = 0.002 for every Ld model, and 1/229 = 0.004, 1/97 = 0.010 and 1/181 = 0.006 for the main, soma-distance and extended-dendrite Poisson models. A p at the floor means the real slope lay outside every shuffle.
 
 ## Main results (193 fully extended axons)
 
@@ -110,7 +110,7 @@ The Ld p for orientation, V1→HVA changed from 0.306 (48 shuffles) to 0.545 (50
    - Neurons with nearby RFs have more axon–dendrite proximity, and hence more synapses. Given the proximity, they are not converted to synapses at a higher rate.
    - The same holds for Ld in V1→HVA and HVA→HVA.
 3. **Orientation in V1→V1: small but significant effects on contact and synapse count, borderline at the synaptic scale.**
-   - Ld: −0.018 per 10°, p = 0.006 (2 of 500 shuffles as extreme). This is significant but small: about 2% less axon–dendrite contact per 10° of orientation difference (e^−0.018 = 0.982). It survives a Holm correction across the 5 Ld tests (adjusted p = 0.012).
+   - Ld: −0.018 per 10°, p = 0.006 (2 of 500 shuffles as extreme). This is significant but small: about 2% less axon–dendrite contact per 10° of orientation difference (e^−0.018 = 0.982). It survives a Holm correction across the 5 Ld tests (adjusted p = 0.012). With soma distance as a covariate it roughly halves (−0.010, p = 0.052), so part of it is shared soma proximity; with extended dendrites only it holds (−0.022, p = 0.004).
    - Nsyn: −0.040, p = 0.004.
    - Nsyn/Ld: −0.021, p = 0.061. Adding soma distance gives p = 0.041, and extended dendrites only gives p = 0.083.
    - Per 10° of orientation difference, synapse count falls by about 4% (e^−0.040). Across the full 90° range that is about a 30% fall.
@@ -119,17 +119,19 @@ The Ld p for orientation, V1→HVA changed from 0.306 (48 shuffles) to 0.545 (50
 ## Sensitivity (full tables in `06_like_to_like_table.md`)
 
 **+ soma-to-soma distance (3D, per 100 µm) as a covariate:**
-- The RF effects shrink but stay beyond the shuffle: Ld V1→V1 goes from −0.89 to −0.52 (p = 0.048, the minimum for 20 shuffles), and Nsyn from −0.86 to −0.64 (p = 0.010). So soma distance explains part of the RF effect, not all of it.
-- The orientation effects are essentially unchanged: Nsyn −0.036 (p = 0.021), Nsyn/Ld −0.026 (p = 0.041).
+- The RF effects shrink, and mostly stay beyond the shuffle: Ld V1→V1 goes from −0.89 to −0.52 (p = 0.002, beyond all 500 shuffles), Ld HVA→HVA from −0.86 to −0.40 (p = 0.002), and Nsyn V1→V1 from −0.86 to −0.64 (p = 0.010). So soma distance explains part of the RF effect, not all of it.
+- **Exception:** Ld V1→HVA shrinks from −0.35 to −0.15 and is no longer beyond the shuffle (p = 0.072).
+- **Orientation, Ld (contact) V1→V1 roughly halves:** −0.018 → −0.010, p = 0.052, no longer beyond the shuffle at 0.05. Ld V1→HVA is +0.033 (p = 0.064, anti-like-to-like direction, not significant).
+- **Orientation at the synapse level is essentially unchanged:** Nsyn −0.036 (p = 0.021), Nsyn/Ld −0.026 (p = 0.041).
 - Nsyn/Ld for RF in V1→V1 becomes −0.167 against a shuffled mean of −0.084, still not beyond the shuffle (p = 0.19).
 
 **Extended dendrites only** (103,320 pairs; the orientation analysis is V1→V1 only):
-- Same pattern. RF: Ld −0.98 (p = 0.027, the minimum for 36 shuffles), Nsyn −0.97 (p = 0.006), Nsyn/Ld −0.10 (p = 0.97).
-- Orientation: Ld −0.022 (p = 0.027), Nsyn −0.047 (p = 0.011), Nsyn/Ld −0.022 (p = 0.083).
+- Same pattern. RF: Ld −0.98 (p = 0.002, beyond all 500 shuffles; V1→HVA −0.26 and HVA→HVA −0.85, both p = 0.002), Nsyn −0.97 (p = 0.006), Nsyn/Ld −0.10 (p = 0.97).
+- Orientation: Ld −0.022 (p = 0.004), Nsyn −0.047 (p = 0.011), Nsyn/Ld −0.022 (p = 0.083).
 
 ## Caveats
 
-- **Permutation counts are below 1,000.** The main Ld models have 500 and the main Poisson models 228. The sensitivity Ld models have only 20 and 36, so their p-values sit at the floor. To go further, rerun `like_to_like.R perm <variant> <track> <n> <min> <workers>`; it resumes. Four workers ran well once the virtualization process was gone.
+- **Permutation counts are below 1,000.** All Ld models have 500. The Poisson models have 228 (main), 96 (soma distance) and 180 (extended dendrites). To go further, rerun `like_to_like.R perm <variant> <track> <n> <min> <workers>`; it resumes. Four workers ran well once the virtualization process was gone.
 - **p-values are not corrected** for the 15 main-variant tests.
 - **Wald CIs understate uncertainty** relative to the permutation null, because the null's spread is set by the structure in the population, not only by sampling noise.
 - **The reference set is fully extended axons only.** The Session 5 finding that partially extended 23P axons are radially truncated therefore doesn't bias these results. It matters if partially extended axons are added later.

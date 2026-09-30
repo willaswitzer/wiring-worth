@@ -26,11 +26,11 @@ Slopes are on the log (link) scale per 10 deg of dissimilarity (negative = like-
 
 | model                       | similarity             | proj         | real slope [95% CI]     | shuffled mean [95% interval]   |   p vs shuffle |   n perms |   n_pairs |
 |:----------------------------|:-----------------------|:-------------|:------------------------|:-------------------------------|---------------:|----------:|----------:|
-| Ld (Tweedie)                | RF-centre distance     | V1->V1       | -0.522 [-0.544, -0.500] | -0.167 [-0.212, -0.109]        |          0.048 |        20 |    126021 |
-| Ld (Tweedie)                | RF-centre distance     | V1->HVA (FF) | -0.150 [-0.226, -0.074] | +0.052 [-0.106, +0.202]        |          0.095 |        20 |    126021 |
-| Ld (Tweedie)                | RF-centre distance     | HVA->HVA     | -0.399 [-0.496, -0.303] | +0.050 [-0.041, +0.143]        |          0.048 |        20 |    126021 |
-| Ld (Tweedie)                | Orientation difference | V1->V1       | -0.010 [-0.014, -0.005] | -0.001 [-0.008, +0.003]        |          0.048 |        20 |     35552 |
-| Ld (Tweedie)                | Orientation difference | V1->HVA (FF) | +0.033 [+0.010, +0.056] | -0.009 [-0.042, +0.022]        |          0.048 |        20 |     35552 |
+| Ld (Tweedie)                | RF-centre distance     | V1->V1       | -0.522 [-0.544, -0.500] | -0.164 [-0.223, -0.105]        |          0.002 |       500 |    126021 |
+| Ld (Tweedie)                | RF-centre distance     | V1->HVA (FF) | -0.150 [-0.226, -0.074] | +0.022 [-0.153, +0.216]        |          0.072 |       500 |    126021 |
+| Ld (Tweedie)                | RF-centre distance     | HVA->HVA     | -0.399 [-0.496, -0.303] | +0.062 [-0.046, +0.182]        |          0.002 |       500 |    126021 |
+| Ld (Tweedie)                | Orientation difference | V1->V1       | -0.010 [-0.014, -0.005] | -0.002 [-0.010, +0.006]        |          0.052 |       500 |     35552 |
+| Ld (Tweedie)                | Orientation difference | V1->HVA (FF) | +0.033 [+0.010, +0.056] | +0.001 [-0.034, +0.034]        |          0.064 |       500 |     35552 |
 | Nsyn (Poisson)              | RF-centre distance     | V1->V1       | -0.642 [-0.757, -0.527] | -0.241 [-0.357, -0.128]        |          0.01  |        96 |    126021 |
 | Nsyn (Poisson)              | RF-centre distance     | V1->HVA (FF) | +0.124 [-0.239, +0.486] | +0.031 [-0.356, +0.394]        |          0.68  |        96 |    126021 |
 | Nsyn (Poisson)              | RF-centre distance     | HVA->HVA     | -0.368 [-0.820, +0.085] | -0.064 [-0.563, +0.393]        |          0.227 |        96 |    126021 |
@@ -46,10 +46,10 @@ Slopes are on the log (link) scale per 10 deg of dissimilarity (negative = like-
 
 | model                       | similarity             | proj         | real slope [95% CI]     | shuffled mean [95% interval]   |   p vs shuffle |   n perms |   n_pairs |
 |:----------------------------|:-----------------------|:-------------|:------------------------|:-------------------------------|---------------:|----------:|----------:|
-| Ld (Tweedie)                | RF-centre distance     | V1->V1       | -0.982 [-1.007, -0.958] | -0.186 [-0.299, -0.087]        |          0.027 |        36 |    103320 |
-| Ld (Tweedie)                | RF-centre distance     | V1->HVA (FF) | -0.261 [-0.359, -0.163] | +0.061 [-0.125, +0.228]        |          0.027 |        36 |    103320 |
-| Ld (Tweedie)                | RF-centre distance     | HVA->HVA     | -0.852 [-0.982, -0.721] | -0.071 [-0.224, +0.109]        |          0.027 |        36 |    103320 |
-| Ld (Tweedie)                | Orientation difference | V1->V1       | -0.022 [-0.027, -0.017] | -0.001 [-0.012, +0.009]        |          0.027 |        36 |     24848 |
+| Ld (Tweedie)                | RF-centre distance     | V1->V1       | -0.982 [-1.007, -0.958] | -0.181 [-0.290, -0.068]        |          0.002 |       500 |    103320 |
+| Ld (Tweedie)                | RF-centre distance     | V1->HVA (FF) | -0.261 [-0.359, -0.163] | +0.036 [-0.129, +0.226]        |          0.002 |       500 |    103320 |
+| Ld (Tweedie)                | RF-centre distance     | HVA->HVA     | -0.852 [-0.982, -0.721] | -0.060 [-0.270, +0.122]        |          0.002 |       500 |    103320 |
+| Ld (Tweedie)                | Orientation difference | V1->V1       | -0.022 [-0.027, -0.017] | -0.000 [-0.014, +0.012]        |          0.004 |       500 |     24848 |
 | Nsyn (Poisson)              | RF-centre distance     | V1->V1       | -0.970 [-1.089, -0.852] | -0.291 [-0.450, -0.127]        |          0.006 |       180 |    103320 |
 | Nsyn (Poisson)              | RF-centre distance     | V1->HVA (FF) | +0.304 [-0.127, +0.735] | +0.059 [-0.445, +0.591]        |          0.365 |       180 |    103320 |
 | Nsyn (Poisson)              | RF-centre distance     | HVA->HVA     | -0.747 [-1.331, -0.163] | -0.178 [-0.844, +0.449]        |          0.11  |       180 |    103320 |
@@ -63,10 +63,10 @@ Slopes are on the log (link) scale per 10 deg of dissimilarity (negative = like-
 
 |                                         |   run |   failed |
 |:----------------------------------------|------:|---------:|
-| ('ext_dend', 'ori_diff_deg', 'Ld')      |    36 |        0 |
+| ('ext_dend', 'ori_diff_deg', 'Ld')      |   500 |        0 |
 | ('ext_dend', 'ori_diff_deg', 'Nsyn')    |   180 |        0 |
 | ('ext_dend', 'ori_diff_deg', 'density') |   180 |        0 |
-| ('ext_dend', 'rf_dist_deg', 'Ld')       |    36 |        0 |
+| ('ext_dend', 'rf_dist_deg', 'Ld')       |   500 |        0 |
 | ('ext_dend', 'rf_dist_deg', 'Nsyn')     |   180 |        0 |
 | ('ext_dend', 'rf_dist_deg', 'density')  |   180 |        0 |
 | ('main', 'ori_diff_deg', 'Ld')          |   500 |        0 |
@@ -75,10 +75,10 @@ Slopes are on the log (link) scale per 10 deg of dissimilarity (negative = like-
 | ('main', 'rf_dist_deg', 'Ld')           |   500 |        0 |
 | ('main', 'rf_dist_deg', 'Nsyn')         |   228 |        0 |
 | ('main', 'rf_dist_deg', 'density')      |   228 |        0 |
-| ('soma', 'ori_diff_deg', 'Ld')          |    20 |        0 |
+| ('soma', 'ori_diff_deg', 'Ld')          |   500 |        0 |
 | ('soma', 'ori_diff_deg', 'Nsyn')        |    96 |        0 |
 | ('soma', 'ori_diff_deg', 'density')     |    96 |        0 |
-| ('soma', 'rf_dist_deg', 'Ld')           |    20 |        0 |
+| ('soma', 'rf_dist_deg', 'Ld')           |   500 |        0 |
 | ('soma', 'rf_dist_deg', 'Nsyn')         |    96 |        0 |
 | ('soma', 'rf_dist_deg', 'density')      |    96 |        0 |
 
