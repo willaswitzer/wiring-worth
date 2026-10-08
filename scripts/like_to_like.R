@@ -234,10 +234,13 @@ run_perm <- function(variant, track, n_target, budget_min) {
   }
 }
 
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args) == 0 || args[1] == "real") {
-  run_real()
-} else if (args[1] == "perm") {
-  if (length(args) >= 6) WORKERS <- as.integer(args[6])
-  run_perm(args[2], args[3], as.integer(args[4]), as.numeric(args[5]))
+# Run only when called as a script; scripts/like_to_like_trunc.R sources this file for its functions.
+if (sys.nframe() == 0) {
+  args <- commandArgs(trailingOnly = TRUE)
+  if (length(args) == 0 || args[1] == "real") {
+    run_real()
+  } else if (args[1] == "perm") {
+    if (length(args) >= 6) WORKERS <- as.integer(args[6])
+    run_perm(args[2], args[3], as.integer(args[4]), as.numeric(args[5]))
+  }
 }
