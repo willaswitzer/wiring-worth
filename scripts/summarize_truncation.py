@@ -148,7 +148,11 @@ def main():
                 ax.set_xlabel("fraction of axon cable kept")
             if j == 0:
                 ax.set_ylabel(f"{SIM_NAMES[sim]}\nslope per 10° (log scale)")
-    h, lab = axes[0, 0].get_legend_handles_labels()
+    h, lab = [], []
+    for a in axes.ravel():  # collect every series (the shuffled band is absent from Ld panels until its perm run)
+        for hh, ll in zip(*a.get_legend_handles_labels()):
+            if ll not in lab:
+                h.append(hh), lab.append(ll)
     fig.legend(h, lab, loc="lower center", ncol=4, frameon=False, fontsize=8.5, bbox_to_anchor=(.5, -.01))
     band = "bootstrap 95%" if boot is not None else "Wald 95% (radial) / range over reps (nulls)"
     fig.suptitle("Like-to-like slope vs. simulated axon completeness, V1→V1", fontsize=10, color=INK, y=.995)

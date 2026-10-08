@@ -15,7 +15,7 @@
 #
 # Models, similarity measures, covariates (post dendrite level) and random effects are those of the
 # Session 6 main variant (scripts/like_to_like.R, which this file sources). Projection types are
-# fixed to those included on the full data, so the set of slopes is the same at every level.
+# those that pass the inclusion rule at every radial level (see FULL_PROJS), fixed across levels.
 
 suppressPackageStartupMessages(source("scripts/like_to_like.R"))
 
@@ -29,8 +29,24 @@ sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
 sets$level <- round(sets$level, 2)
 sets <- sets[order(sets$cond != "radial", -sets$level, sets$cond, sets$rep), ]
 
-# Projection types included on the full (untruncated) data
-FULL_PROJS <- setNames(lapply(SIMS, function(s) prep_variant(VARIANT, s)$projs), SIMS)
+# Projection types: Ding's inclusion rule (> 30 synapses, > 5 presynaptic neurons with synapses,
+# none > 50%) must hold on the real data at EVERY radial level, so no slope is fitted on a
+# projection that truncation has emptied. V1->HVA (feedforward) fails below f = 1: its synapses are
+# distal (3 of 119 left at f = 0.5), so it is excluded; see notebooks/07_results.md.
+radial_ids <- sets$set[sets$cond == "radial"]
+set_pairs_raw <- function(set_id) {
+  t <- as.data.frame(read_parquet(file.path(SET_DIR, paste0(set_id, ".parquet"))))
+  p <- pairs; p$Ld_um[t$row + 1] <- t$Ld_um; p$Nsyn[t$row + 1] <- t$Nsyn; p
+}
+radial_pairs <- lapply(radial_ids, set_pairs_raw)
+FULL_PROJS <- setNames(lapply(SIMS, function(s) {
+  ok <- lapply(radial_pairs, function(p) {
+    d <- p; d$sim <- real_sim[[s]]; included_projs(d[!is.na(d$sim), ])
+  })
+  sort(Reduce(intersect, ok))
+}), SIMS)
+rm(radial_pairs)
+cat("projection types fitted:", paste(names(FULL_PROJS), sapply(FULL_PROJS, paste, collapse = ", "), sep = ": ", collapse = "; "), "\n")
 STARTS <- readRDS(file.path(OUT_DIR, "real_starts.rds"))
 TRACK_MODELS <- list(poisson = c("Nsyn", "density"), tweedie = "Ld")
 
@@ -69,8 +85,14 @@ slopes_se <- function(fit) {
 fit_set <- function(p, models, sim_values = real_sim) {
   out <- list()
   for (sim_name in SIMS) {
-    d <- model_data(p, sim_name, sim_values)
+    d_all <- model_data(p, sim_name, sim_values)
     for (model in models) {
+      # a bootstrap sample can leave a projection with no synapses (or no Ld > 0 pairs); its slope
+      # is then not estimable, so that projection is dropped from this one fit
+      d <- if (model == "density") d_all[d_all$Ld_um > 0, ] else d_all
+      has <- tapply(d$Nsyn, d$proj, sum) > 0
+      d <- d[d$proj %in% names(has)[!is.na(has) & has], ]
+      d$proj <- droplevels(d$proj); d$pre_proj <- droplevels(d$pre_proj)
       st <- STARTS[[paste(VARIANT, sim_name, model)]]
       st <- st[lengths(st) > 0]
       t0 <- Sys.time()
