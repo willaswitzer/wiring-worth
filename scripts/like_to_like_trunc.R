@@ -8,7 +8,8 @@
 #       seeds as like_to_like.R, so level 1 reproduces the Session 6 null
 #   .r-env/bin/Rscript scripts/like_to_like_trunc.R boot <track> <B> [workers]
 #       paired bootstrap over presynaptic neurons: every bootstrap sample is refitted at all radial
-#       levels and at rep 0 of both nulls, so CIs are for the shift slope(f) - slope(1)
+#       levels and at one rep of each null (rotating through the reps), so CIs are for the shift
+#       slope(f) - slope(1) and include the nulls' own randomness
 # track = poisson (Nsyn + density models) or tweedie (Ld model). The Tweedie fits cost ~8x more,
 # so the tweedie track uses only levels in LD_LEVELS (and rep 0 of the nulls).
 # All modes resume from their output CSV in data/truncation/.
@@ -167,8 +168,12 @@ run_perm_trunc <- function(track, n, workers, levels) {
 }
 
 # ---------------------------------------------------------------- boot: paired bootstrap over pre neurons
-boot_sets <- function(track) {
-  s <- sets[sets$rep == 0, ]
+boot_sets <- function(track, b) {
+  # radial sets, plus one rep of each null: bootstrap sample b uses rep (b - 1) mod n_reps, so the
+  # bootstrap distribution of a null includes its own randomness (which cable/synapses are removed)
+  # as well as the resampling of presynaptic neurons, at no extra cost
+  n_reps <- max(sets$rep) + 1
+  s <- sets[sets$cond == "radial" | sets$rep == (b - 1) %% n_reps, ]
   if (track == "tweedie") s <- s[s$level %in% LD_LEVELS, ]
   s
 }
@@ -180,8 +185,9 @@ boot_one <- function(b, track) {
   rows <- unlist(lapply(seq_along(draw), function(k) which(pairs$pre_root_id == draw[k])))
   copy <- rep(seq_along(draw), vapply(draw, function(x) sum(pairs$pre_root_id == x), 1L))
   out <- list()
-  for (i in seq_len(nrow(boot_sets(track)))) {
-    s <- boot_sets(track)[i, ]
+  bs <- boot_sets(track, b)
+  for (i in seq_len(nrow(bs))) {
+    s <- bs[i, ]
     p <- set_pairs(s$set)[rows, ]
     p$pre_proj <- factor(paste(copy, p$pre_proj))  # each drawn copy is its own random-effect level
     sim_b <- lapply(real_sim, function(x) x[rows])
