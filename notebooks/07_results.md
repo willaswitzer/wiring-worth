@@ -74,7 +74,8 @@ HVA→HVA (RF): Ld goes −0.86 → −1.30 (p = 0.005 at every level), and Nsyn
 1. **Radial truncation inflates the RF like-to-like rule; random cable loss doesn't.**
    - At 30% of cable, the RF synapse-count slope steepens by −0.27 [−0.41, −0.14], about 32%. Contact (Ld) follows: −0.90 → −1.10.
    - Random cable loss of the same amount doesn't shift it: −0.05 [−0.19, +0.09]. The radial − blocks contrast excludes 0: −0.22 [−0.39, −0.05].
-   - The bias is already detectable at 70% of cable: −0.08 [−0.13, −0.02]. That is roughly where real 23P partial axons sit (cable ratio ~0.75, Session 5).
+   - The bias is already detectable at 70% of cable: −0.08 [−0.13, −0.02].
+   - **But it comes from 4P axons, not 23P** (see the cell-type section). Real partial 23P axons sit at a cable ratio of ~0.75 (Session 5), yet 23P shows no detectable bias.
 2. **Part of the inflation is shared with the shuffled null; most is not.**
    - The shuffled RF slope also steepens with truncation (Nsyn −0.26 → −0.33; Ld −0.17 → −0.19). Truncation strengthens the between-group RF–connectivity association that the shuffle keeps (Session 6, point 1).
    - The real-minus-shuffle gap still grows: Nsyn −0.60 → −0.80, Ld −0.73 → −0.92. That is about 75% (Nsyn) and 89% (Ld) of the raw shift.
@@ -83,17 +84,34 @@ HVA→HVA (RF): Ld goes −0.86 → −1.30 (p = 0.005 at every level), and Nsyn
    - The slope drifts more negative (−0.10 → −0.24), but stays inside the shuffle (p = 0.20 at f = 0.3), and its shift CI includes 0.
    - So the Session 6 conclusion holds under truncation: the RF rule is in contact, not in how contact is converted to synapses.
    - Caveat for partially proofread data: at 30% of cable the point estimate is 2.5× its full-axon value.
-4. **The synsub null isn't neutral; the plan's expectation was wrong.**
-   - Subsampling each axon's synapses to radial's count steepens RF Nsyn by −0.15 [−0.25, −0.02] at f = 0.3.
-   - The reason is that the match is per axon. Radial truncation keeps 48% of 23P and 41% of 4P synapses onto usable targets, but 27% of 5P-IT and 19% of 6P-IT, so the pooled fit leans on the axons that keep the most.
-   - So synsub measures the **across-axon re-weighting** part of truncation, and radial − synsub measures the **within-axon spatial** part.
-   - For RF Nsyn the two are comparable at f = 0.3 (re-weighting −0.15; spatial −0.13 [−0.27, +0.02]), and neither is separable from 0 on its own with 193 axons.
-   - For orientation, the spatial part is clearly nonzero at every level (−0.037 [−0.061, −0.014] at f = 0.3). Re-weighting pushes the other way (+0.018).
-   - **To check before the preprint:** per-cell-type slopes, to confirm the re-weighting account.
+4. **The synsub null drifts somewhat, but cell-type composition does not explain the radial effect.**
+   - Subsampling each axon's synapses to radial's count steepens RF Nsyn by −0.09 at f = 0.3 (mean of 5 reps; reps range from −0.06 to −0.15).
+   - The bootstrap CIs for both nulls above used rep 0 only, and for synsub rep 0 is the most extreme rep. They are being recomputed with the reps rotated across bootstrap samples (`scripts/run_truncation_boot.sh`). Radial CIs are unaffected.
+   - **Composition is not the explanation.** Radial truncation does keep more 23P/4P than 5P-IT synapses (48%, 41%, 27%). But re-weighting the full-axon per-cell-type slopes (23P −1.09, 4P −0.78, 5P-IT −0.63) by the synapses kept at f = 0.3 moves the pooled slope by only −0.02. The radial effect is *within* cell types (see the cell-type section below).
 5. **Orientation:** the rule is beyond the shuffle at every level for Ld and Nsyn.
    - Truncation strengthens Nsyn modestly (−0.040 → −0.057). The shift CI excludes 0 at f = 0.7 and 0.5 and is borderline at 0.3.
    - Nsyn/Ld becomes nominally significant at f = 0.5 (p = 0.020), against p = 0.055 for full axons. A partially proofread dataset could therefore report an orientation rule at the synaptic scale that full axons only weakly support.
 6. **Truncation erases interareal (feedforward) wiring first.** V1→HVA synapses are distal: 119 → 3 at f = 0.5. Rules for interareal projections can't be measured from radially truncated axons at all. HVA→HVA survives (89 → 38 synapses at f = 0.3) and shows the same RF inflation as V1→V1.
+
+## Cell-type check: the bias is in 4P, not 23P
+
+`scripts/celltype_truncation_check.R`: the V1→V1 RF Nsyn model is fitted separately to 23P and 4P presynaptic axons, with a paired bootstrap over that cell type's neurons (200 samples). This was run in the cloud test environment (glmmTMB 1.1.8, which reproduced the pinned fits exactly at f = 1).
+
+| cell type | slope at f = 1 | shift at f = 0.7 | shift at f = 0.5 | shift at f = 0.3 |
+|---|---|---|---|---|
+| 23P (64 axons, 940 synapses) | −1.09 | −0.04 [−0.16, +0.03] | −0.05 [−0.22, +0.06] | −0.03 [−0.27, +0.14] |
+| 4P (90 axons, 2,063 synapses) | −0.78 | −0.07 [−0.15, −0.01] | −0.12 [−0.22, −0.02] | **−0.33 [−0.50, −0.18]** |
+
+5P-IT (21 axons) moves from −0.63 to −1.08 at f = 0.3, but its SE is 0.34, so it can't be interpreted.
+
+- **The pooled radial effect comes from 4P (and possibly 5P-IT) axons.** 4P's RF preference is concentrated near the soma, and its distal synapses go to RF-dissimilar targets. 23P axons show the same RF preference near and far, so cutting them back barely changes their slope.
+- **This matters for what the preprint can claim.** Session 5 found that real partially extended *23P* axons look radially truncated, while real partial *4P* axons look thinned beyond ~200 µm rather than cut off.
+  - So the cell type whose real incompleteness matches the radial model (23P) shows no detectable bias. Its CI at f = 0.7 is [−0.16, +0.03], so a bias of up to about 15% can't be excluded.
+  - The cell type that would be strongly biased by radial truncation (4P) is, in the real data, incomplete in a different way.
+- **Revised framing:** "incompleteness biases the inferred rule" depends on how incompleteness interacts with each cell type's spatial wiring layout. Simulations need to match each cell type's real incompleteness pattern before predicting the bias in a real partially proofread dataset.
+- **Next analyses:**
+  - A **calibrated** condition: remove cable per cell type with the probability-vs-path-distance profile of real partial axons (Session 5 cable-deficit table, 23P and 4P). This predicts the bias in a dataset like the real one.
+  - The plan's **third curve**: real 23P (and 4P) partial vs. full axons, as a direct test of that prediction.
 
 ## Next
 
