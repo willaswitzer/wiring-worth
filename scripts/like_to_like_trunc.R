@@ -26,7 +26,16 @@ VARIANT <- "main"
 COVARS <- VARIANTS[[VARIANT]]$covars
 
 SET_DIR <- sprintf("%s/sets_v%d", TRUNC_DIR, VERSION)
-sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
+# Optional environment settings (defaults = the main truncation analysis):
+#   TRUNC_INDEX   set index to fit (index.csv; index_calib.csv for scripts/calibrated_truncation.py)
+#   TRUNC_TAG     suffix for output files (e.g. "calib" -> trunc_slopes_poisson_calib.csv)
+#   TRUNC_PRE_CT  restrict to presynaptic axons of one cell type (e.g. "23P"); V1->V1 only
+INDEX_FILE <- Sys.getenv("TRUNC_INDEX", "index.csv")
+TAG <- Sys.getenv("TRUNC_TAG", "")
+PRE_CT <- Sys.getenv("TRUNC_PRE_CT", "")
+SUFFIX <- paste0(if (TAG != "") paste0("_", TAG) else "", if (PRE_CT != "") paste0("_", PRE_CT) else "")
+main_sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
+sets <- read.csv(file.path(SET_DIR, INDEX_FILE), stringsAsFactors = FALSE)
 sets$level <- round(sets$level, 2)
 sets <- sets[order(sets$cond != "radial", -sets$level, sets$cond, sets$rep), ]
 
@@ -34,7 +43,7 @@ sets <- sets[order(sets$cond != "radial", -sets$level, sets$cond, sets$rep), ]
 # none > 50%) must hold on the real data at EVERY radial level, so no slope is fitted on a
 # projection that truncation has emptied. V1->HVA (feedforward) fails below f = 1: its synapses are
 # distal (3 of 119 left at f = 0.5), so it is excluded; see notebooks/07_results.md.
-radial_ids <- sets$set[sets$cond == "radial"]
+radial_ids <- main_sets$set[main_sets$cond == "radial"]  # always the main radial levels
 set_pairs_raw <- function(set_id) {
   t <- as.data.frame(read_parquet(file.path(SET_DIR, paste0(set_id, ".parquet"))))
   p <- pairs; p$Ld_um[t$row + 1] <- t$Ld_um; p$Nsyn[t$row + 1] <- t$Nsyn; p
@@ -47,6 +56,7 @@ FULL_PROJS <- setNames(lapply(SIMS, function(s) {
   sort(Reduce(intersect, ok))
 }), SIMS)
 rm(radial_pairs)
+if (PRE_CT != "") FULL_PROJS <- lapply(FULL_PROJS, intersect, "V1->V1")
 cat("projection types fitted:", paste(names(FULL_PROJS), sapply(FULL_PROJS, paste, collapse = ", "), sep = ": ", collapse = "; "), "\n")
 STARTS <- readRDS(file.path(OUT_DIR, "real_starts.rds"))
 TRACK_MODELS <- list(poisson = c("Nsyn", "density"), tweedie = "Ld")
@@ -66,6 +76,7 @@ model_data <- function(p, sim_name, sim_values) {
   d <- p
   d$sim <- sim_values[[sim_name]] / 10
   d <- d[!is.na(d$sim) & d$proj %in% FULL_PROJS[[sim_name]], ]
+  if (PRE_CT != "") d <- d[d$pre_cell_type == PRE_CT, ]
   d$proj <- factor(d$proj, levels = FULL_PROJS[[sim_name]])
   d$pre_proj <- droplevels(d$pre_proj)
   d
@@ -117,7 +128,9 @@ fit_set <- function(p, models, sim_values = real_sim) {
 }
 
 track_sets <- function(track) {
-  if (track == "tweedie") sets[sets$level %in% LD_LEVELS & sets$rep == 0, ] else sets
+  # the Tweedie track uses only LD_LEVELS (and rep 0) of the main conditions; other conditions in full
+  main_cond <- sets$cond %in% c("radial", "blocks", "synsub")
+  if (track == "tweedie") sets[!main_cond | (sets$level %in% LD_LEVELS & sets$rep == 0), ] else sets
 }
 
 append_csv <- function(res, f) {
@@ -126,7 +139,7 @@ append_csv <- function(res, f) {
 
 # ---------------------------------------------------------------- fit: real similarity, every set
 run_fit <- function(track, workers, max_sets = Inf) {
-  f <- file.path(TRUNC_DIR, sprintf("trunc_slopes_%s.csv", track))
+  f <- file.path(TRUNC_DIR, sprintf("trunc_slopes_%s%s.csv", track, SUFFIX))
   done <- if (file.exists(f)) unique(read.csv(f)$set) else character(0)
   todo <- track_sets(track)
   todo <- head(todo[!todo$set %in% done, ], max_sets)
@@ -146,8 +159,16 @@ run_fit <- function(track, workers, max_sets = Inf) {
 }
 
 # ---------------------------------------------------------------- perm: shuffled control on radial sets
+perm_set <- function(level, perm) {
+  # level > 0: the radial set at that level; level 0: a non-radial condition of this index (calibrated
+  # truncation), rotating through its reps across permutations
+  if (level > 0) return(sprintf("radial_%.2f_0", level))
+  nr <- sets[sets$cond != "radial", ]
+  cond <- nr$cond[1]
+  sprintf("%s_0.00_%d", cond, (perm - 1) %% (max(nr$rep[nr$cond == cond]) + 1))
+}
 run_perm_trunc <- function(track, n, workers, levels) {
-  f <- file.path(TRUNC_DIR, sprintf("trunc_perm_%s.csv", track))
+  f <- file.path(TRUNC_DIR, sprintf("trunc_perm_%s%s.csv", track, SUFFIX))
   done <- if (file.exists(f)) unique(read.csv(f)[, c("level", "perm")]) else data.frame(level = numeric(0), perm = integer(0))
   jobs <- expand.grid(perm = seq_len(n), level = levels)
   jobs <- jobs[!paste(jobs$level, jobs$perm) %in% paste(round(done$level, 2), done$perm), ]
@@ -155,7 +176,7 @@ run_perm_trunc <- function(track, n, workers, levels) {
   for (b in split(seq_len(nrow(jobs)), ceiling(seq_len(nrow(jobs)) / (workers * 2)))) {
     res <- mclapply(b, function(i) {
       j <- jobs[i, ]
-      p <- set_pairs(sprintf("radial_%.2f_0", j$level))
+      p <- set_pairs(perm_set(j$level, j$perm))
       cbind(level = j$level, perm = j$perm,
             fit_set(p, TRACK_MODELS[[track]], sim_values = similarity(permute_props(10000 + j$perm))))
     }, mc.cores = workers, mc.preschedule = FALSE)
@@ -174,13 +195,13 @@ boot_sets <- function(track, b) {
   # as well as the resampling of presynaptic neurons, at no extra cost
   n_reps <- max(sets$rep) + 1
   s <- sets[sets$cond == "radial" | sets$rep == (b - 1) %% n_reps, ]
-  if (track == "tweedie") s <- s[s$level %in% LD_LEVELS, ]
+  if (track == "tweedie") s <- s[!(s$cond %in% c("radial", "blocks", "synsub")) | s$level %in% LD_LEVELS, ]
   s
 }
 
 boot_one <- function(b, track) {
   set.seed(20000 + b)
-  pres <- unique(pairs$pre_root_id)
+  pres <- unique(pairs$pre_root_id[if (PRE_CT != "") pairs$pre_cell_type == PRE_CT else TRUE])
   draw <- sample(pres, length(pres), replace = TRUE)
   rows <- unlist(lapply(seq_along(draw), function(k) which(pairs$pre_root_id == draw[k])))
   copy <- rep(seq_along(draw), vapply(draw, function(x) sum(pairs$pre_root_id == x), 1L))
@@ -198,7 +219,7 @@ boot_one <- function(b, track) {
 }
 
 run_boot <- function(track, B, workers) {
-  f <- file.path(TRUNC_DIR, sprintf("trunc_boot_%s.csv", track))
+  f <- file.path(TRUNC_DIR, sprintf("trunc_boot_%s%s.csv", track, SUFFIX))
   done <- if (file.exists(f)) unique(read.csv(f)$boot) else integer(0)
   todo <- setdiff(seq_len(B), done)
   t0 <- Sys.time()
@@ -218,7 +239,7 @@ if (mode == "fit") {
   run_fit(track, if (length(args) >= 3) as.integer(args[3]) else 2,
           if (length(args) >= 4) as.integer(args[4]) else Inf)
 } else if (mode == "perm") {
-  lv <- if (length(args) >= 5) as.numeric(strsplit(args[5], ",")[[1]]) else c(1, 0.5, 0.3)
+  lv <- if (length(args) >= 5) as.numeric(strsplit(args[5], ",")[[1]]) else if (TAG == "calib") c(1, 0) else c(1, 0.5, 0.3)
   run_perm_trunc(track, as.integer(args[3]), if (length(args) >= 4) as.integer(args[4]) else 2, lv)
 } else if (mode == "boot") {
   run_boot(track, as.integer(args[3]), if (length(args) >= 4) as.integer(args[4]) else 2)

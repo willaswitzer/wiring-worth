@@ -26,7 +26,7 @@ B <- as.integer(commandArgs(TRUE)[1])
 res <- list()
 for (ct in c("23P", "4P")) {
   est <- sapply(ids, function(id) { d <- P[[id]][P[[id]]$pre_cell_type == ct, ]; d$pre_proj <- droplevels(d$pre_proj); slope(d) })
-  bs <- do.call(rbind, parallel::mclapply(seq_len(B), one, ct = ct, mc.cores = 2))
+  bs <- do.call(rbind, parallel::mclapply(seq_len(B), one, ct = ct, mc.cores = as.integer(Sys.getenv("WORKERS", "4"))))
   sh <- bs - bs[, 1]
   res[[ct]] <- data.frame(cell_type = ct, level = c(1, .7, .5, .3), slope = est, shift = est - est[1],
                           lo = apply(sh, 2, quantile, .025), hi = apply(sh, 2, quantile, .975), n_boot = sum(complete.cases(bs)))
