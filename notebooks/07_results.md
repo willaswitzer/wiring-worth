@@ -113,10 +113,69 @@ HVA→HVA (RF): Ld goes −0.86 → −1.30 (p = 0.005 at every level), and Nsyn
   - A **calibrated** condition: remove cable per cell type with the probability-vs-path-distance profile of real partial axons (Session 5 cable-deficit table, 23P and 4P). This predicts the bias in a dataset like the real one.
   - The plan's **third curve**: real 23P (and 4P) partial vs. full axons, as a direct test of that prediction.
 
+## Calibrated truncation: realistic incompleteness barely biases the rule
+
+`scripts/calibrated_truncation.py`: each fully extended 23P and 4P axon gets random **branch cuts**, and each cut removes everything beyond it.
+- **Calibration:** the cut probability per path length is set so the expected kept cable at each distance equals the real partial/full cable ratio for that cell type (Session 5 profile).
+- **Fit to target:** the achieved profile matches within 0.06 in every bin. Mean cable kept is 0.745 for 23P (real ratio ~0.75) and 0.78 for 4P (~0.80).
+- **Other cell types:** no calibration exists, so their 26 axons are left complete.
+- **Repeats and null:** 20 random repeats, plus a null (`calibblk`) that removes the same cable per axon as random 25 µm cubes.
+- **Fitting and uncertainty:** `like_to_like_trunc.R` with `TRUNC_INDEX=index_calib.csv TRUNC_TAG=calib`. The paired bootstrap rotates through the 20 repeats.
+- **Environment:** run here in the cloud test environment (glmmTMB 1.1.8), to be repeated on the pinned environment by `scripts/run_session7_finish.sh`.
+
+**Shift in the V1→V1 slope vs. full axons**, mean over repeats [95% paired bootstrap, 200 samples]:
+
+| | full-axon slope | calibrated | cable-matched random null |
+|---|---|---|---|
+| RF, Nsyn (pooled) | −0.856 | **−0.012 [−0.090, +0.073]** | +0.011 [−0.072, +0.105] |
+| RF, Nsyn/Ld | −0.096 | +0.009 [−0.062, +0.097] | +0.017 [−0.074, +0.131] |
+| orientation, Nsyn | −0.040 | −0.001 [−0.016, +0.013] | −0.002 [−0.019, +0.014] |
+| orientation, Nsyn/Ld | −0.021 | −0.001 [−0.016, +0.011] | −0.003 [−0.018, +0.012] |
+| RF, Nsyn, 23P only | −1.091 | −0.015 (rep SD 0.04) | −0.013 |
+| RF, Nsyn, 4P only | −0.783 | −0.021 (rep SD 0.05) | +0.006 |
+
+- **The RF rule is about 1% steeper on average, and the CI rules out a bias beyond about ±10%.** For comparison, uniform radial truncation to 30% of cable shifts it by −0.27, about 32%.
+- **Orientation:** the calibrated shift is near zero. Its CI (±0.015) is wide relative to the small orientation slope (−0.040).
+- **Calibrated vs. null:** the difference is −0.025 [−0.109, +0.068] for RF Nsyn.
+
+## Real partial vs. full axons (the plan's third curve)
+
+`scripts/prepare_partial.py` + `scripts/partial_vs_full.R`: the same models fitted to real partially extended axons (23P: 107; 4P: 167) and fully extended axons (23P: 64; 4P: 90), V1→V1. The model is `y ~ sim × axon_level + covariates + (1 | pre)`. Wald estimates are below; the bootstrap and shuffled control are in the final run.
+
+| | full | partial | partial − full (SE) | + soma distance |
+|---|---|---|---|---|
+| 23P, RF, Nsyn | −1.08 | −1.14 | −0.06 (0.14) | −0.05 (0.14) |
+| 4P, RF, Nsyn | −0.79 | −0.93 | −0.14 (0.10) | −0.04 (0.10) |
+| 23P, RF, Nsyn/Ld | −0.22 | −0.26 | −0.04 (0.16) | −0.09 (0.15) |
+| 4P, RF, Nsyn/Ld | −0.13 | +0.05 | +0.17 (0.11) | +0.09 (0.11) |
+| 23P, orientation, Nsyn | −0.00 | −0.06 | −0.054 (0.028) | −0.054 (0.028) |
+| 4P, orientation, Nsyn | −0.06 | −0.07 | −0.016 (0.021) | −0.020 (0.021) |
+
+- **RF:** real partial axons show the same rule as full axons within error. The calibrated simulation predicted shifts of −0.015 (23P) and −0.021 (4P), and the observed differences are consistent with both that prediction and with 0.
+  - The 4P difference (−0.14) shrinks to −0.04 once soma distance is included. Partial and full 4P somata sit differently relative to the co-registered targets (Session 5): partial 4P axons have less than half the Ld per axon (9.5 vs 21.6 mm).
+- **Orientation in 23P is the exception.** Partial 23P axons show an orientation rule (−0.056) that full 23P axons don't (−0.002); the difference is −0.054 (SE 0.028, z = −1.9).
+  - The calibrated simulation predicts ~0, so if real, this is not a completeness effect. It could reflect which 23P neurons got fully proofread.
+  - It is one of 16 uncorrected tests. Treat it as a lead to check, not a finding.
+
+## Revised summary for the preprint
+
+1. Incompleteness *can* bias an inferred wiring rule, but how much depends on the pattern of loss and on each cell type's spatial wiring layout.
+   - Cutting axons back uniformly from the far end inflates the RF like-to-like rule by up to 32%. The effect comes from 4P axons, whose RF-similar partners lie near the soma.
+   - Random loss of the same amount of cable has no effect.
+2. Simulated with MICrONS's actual partial-proofreading profiles, the bias is ~1% (CI within about ±10%).
+3. Real partial axons agree with full ones within error, as the calibrated simulation predicts.
+4. **So the published like-to-like rule is robust to the reconstruction incompleteness present in MICrONS.**
+   - The method (calibrate a cut model on partial vs. full axons, then simulate) gives an error budget for any wiring rule, which mirrors the Fly project.
+   - Interareal (V1→HVA) projections are the exception: they are lost first under cutting back from the far end.
+
 ## Next
 
-- **Preprint figure:** plot the paired shift slope(f) − slope(1) with bootstrap CIs (radial vs. both nulls), plus the real-minus-shuffle gap. The current figure plots marginal slopes, so its bands overlap more than the paired contrasts warrant.
-- **Ld (Tweedie) bootstrap:** 100 samples, overnight.
-- **Per-cell-type slopes:** to test the re-weighting account (point 4).
-- **The plan's third curve:** real 23P partial vs. full axons, at their observed cable ratio.
-- **Sensitivity:** block size (10 and 50 µm); branch-order truncation.
+- **Final run on the pinned environment** (`scripts/run_session7_finish.sh`, ~5 h):
+  - the main bootstrap with rotated reps
+  - calibrated fits, bootstrap and shuffle
+  - the within-cell-type radial bootstrap
+  - partial vs. full with bootstrap and shuffle
+- **Ld (Tweedie) bootstrap:** optional.
+- **Sensitivity:** block size; per-cell-type calibration uncertainty (resample the Session 5 profile).
+- **23P orientation lead:** do fully vs. partially proofread 23P differ in depth or position, or in tuning?
+- **Write the preprint around the revised summary above.**
