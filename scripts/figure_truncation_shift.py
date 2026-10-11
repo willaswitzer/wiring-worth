@@ -15,6 +15,11 @@ of its cable:
   at the levels with a shuffled control (f = 1, 0.5, 0.3), i.e. the part of the shift that the
   shuffled-wiring control does not also show.
 The dotted vertical line marks the cable ratio of real partially extended 23P axons (~0.75, Session 5).
+
+Third column (if the calibrated and partial-vs-full outputs exist), Nsyn only: the bias predicted by
+calibrated truncation (branch cuts matching real partial axons; pooled with 95% paired bootstrap, and per
+cell type with the range over 20 reps) next to the observed slope difference between real partially and
+fully extended axons of the same cell type (95% bootstrap over presynaptic neurons).
 """
 import sys
 from pathlib import Path
@@ -40,6 +45,58 @@ COND = {  # validated categorical slots 1-3 (dataviz palette, light surface); ma
     "synsub": ("#1baf7a", "^", ":", "random synapse subsample"),
 }
 INK, MUTED, GRID, SURFACE = "#1f1f1e", "#6b6a63", "#e4e3dd", "#fcfcfb"
+
+
+def load_calibration():
+    files = ["trunc_slopes_poisson_calib.csv", "trunc_boot_poisson_calib.csv", "partial_vs_full.csv",
+             "partial_vs_full_boot.csv"] + [f"trunc_slopes_poisson_calib_{ct}.csv" for ct in ("23P", "4P")]
+    if not all((TD / f).exists() for f in files):
+        return None
+    out = {}
+    f = pd.read_csv(TD / "trunc_slopes_poisson_calib.csv")
+    f = f[(f["proj"] == PROJ) & (f["model"] == "Nsyn")]
+    ref = f[f["set"] == "radial_1.00_0"].set_index("sim")["slope"]
+    b = pd.read_csv(TD / "trunc_boot_poisson_calib.csv")
+    b = b[(b["proj"] == PROJ) & (b["model"] == "Nsyn")]
+    bref = b[b["set"] == "radial_1.00_0"].set_index(["boot", "sim"])["slope"].rename("r")
+    b = b.join(bref, on=["boot", "sim"])
+    b["shift"] = b["slope"] - b["r"]
+    for sim in SIMS:
+        est = f[(f["cond"] == "calib") & (f["sim"] == sim)]["slope"].mean() - ref[sim]
+        q = b[(b["cond"] == "calib") & (b["sim"] == sim)]["shift"].quantile([.025, .975]).to_numpy()
+        out[("pooled", sim)] = (est, q[0], q[1])
+        for ct in ("23P", "4P"):
+            c = pd.read_csv(TD / f"trunc_slopes_poisson_calib_{ct}.csv")
+            c = c[(c["proj"] == PROJ) & (c["model"] == "Nsyn") & (c["sim"] == sim)]
+            r = c[c["set"] == "radial_1.00_0"]["slope"].iloc[0]
+            sh = c[c["cond"] == "calib"]["slope"] - r
+            out[("pred", ct, sim)] = (sh.mean(), sh.min(), sh.max())
+    e = pd.read_csv(TD / "partial_vs_full.csv")
+    e = e[(e["model"] == "Nsyn") & (e["variant"] == "main")]
+    bb = pd.read_csv(TD / "partial_vs_full_boot.csv")
+    bb = bb[(bb["model"] == "Nsyn") & (bb["variant"] == "main")]
+    for _, r in e.iterrows():
+        q = bb[(bb["cell_type"] == r["cell_type"]) & (bb["sim"] == r["sim"])]["diff"].quantile([.025, .975]).to_numpy()
+        out[("obs", r["cell_type"], r["sim"])] = (r["diff"], q[0], q[1])
+    return out
+
+
+def validation_panel(ax, cal, sim, top):
+    """Predicted (calibrated) vs observed (real partial - full) shift, Nsyn, per cell type."""
+    ax.axhline(0, color=MUTED, lw=.8, zorder=1)
+    items = [("pooled", 0, cal[("pooled", sim)], INK, "*", "calibrated, predicted (pooled)")]
+    for k, ct in enumerate(("23P", "4P")):
+        items.append((ct, 1 + 1.2 * k, cal[("pred", ct, sim)], INK, "o", "calibrated, predicted (cell type)"))
+        items.append((ct, 1.45 + 1.2 * k, cal[("obs", ct, sim)], COND["radial"][0], "D", "real partial − full axons"))
+    for _, x, (y, lo, hi), col, mk, lab in items:
+        ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt=mk, color=col, ms=11 if mk == "*" else 5.5,
+                    capsize=2.5, lw=1.2, markeredgecolor="white", markeredgewidth=.6, label=lab, zorder=3)
+    ax.set_xticks([0, 1.22, 2.42], ["all", "23P", "4P"])
+    ax.set_xlim(-.5, 2.95)
+    ax.grid(axis="y", color=GRID, lw=.6, zorder=0)
+    ax.spines[["top", "right"]].set_visible(False)
+    if top:
+        ax.set_title("Realistic incompleteness\n(Nsyn)", fontsize=9.5, color=INK)
 
 
 def main():
@@ -80,7 +137,10 @@ def main():
     # ------------------------------------------------------------ figure
     plt.rcParams.update({"font.size": 9, "axes.edgecolor": MUTED, "axes.labelcolor": INK, "xtick.color": MUTED,
                          "ytick.color": MUTED, "font.family": "DejaVu Sans"})
-    fig, axes = plt.subplots(2, 2, figsize=(7.2, 6.0), squeeze=False)
+    calib = load_calibration()
+    ncol = 3 if calib is not None else 2
+    fig, axes = plt.subplots(2, ncol, figsize=(3.6 * ncol, 6.0), squeeze=False,
+                             gridspec_kw={"width_ratios": [1, 1, .62][:ncol]})
     for i, sim in enumerate(SIMS):
         for j, model in enumerate(MODELS):
             ax = axes[i, j]
@@ -106,13 +166,20 @@ def main():
             if i == 0 and j == 0:
                 ax.annotate("real 23P\npartial axons", xy=(PARTIAL_23P_CABLE, ax.get_ylim()[1]), xytext=(3, -2),
                             textcoords="offset points", fontsize=7.5, color=MUTED, va="top")
-    h, lab = axes[0, 0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="lower center", ncol=2, frameon=False, fontsize=8.5, bbox_to_anchor=(.5, -.005))
+    if calib is not None:
+        for i, sim in enumerate(SIMS):
+            validation_panel(axes[i, 2], calib, sim, top=i == 0)
+    h, lab = [], []
+    for a in axes.ravel():
+        for hh, ll in zip(*a.get_legend_handles_labels()):
+            if ll not in lab:
+                h.append(hh), lab.append(ll)
+    fig.legend(h, lab, loc="lower center", ncol=3, frameon=False, fontsize=8.5, bbox_to_anchor=(.5, -.005))
     fig.suptitle("Change in the V1→V1 like-to-like slope as axons are made incomplete", fontsize=10, color=INK,
                  y=.995)
     fig.text(.5, .952, "below 0 = rule looks stronger; bands: 95% paired bootstrap over presynaptic neurons",
              ha="center", fontsize=8, color=MUTED)
-    fig.tight_layout(rect=(0, .07, 1, .95))
+    fig.tight_layout(rect=(0, .1, 1, .95))
     for ext in ("png", "pdf"):
         fig.savefig(ROOT / "figures" / f"07_truncation_shift.{ext}", dpi=300, facecolor=SURFACE)
 
