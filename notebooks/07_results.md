@@ -165,12 +165,37 @@ p = 0.010 is the floor for 100 shuffles.
   - The 4P point estimate (−0.14) shrinks to −0.04 with soma distance. Partial and full 4P somata sit differently relative to the co-registered targets (Session 5): partial 4P axons have less than half the Ld per axon (9.5 vs 21.6 mm).
 - **Orientation in 23P:** partial 23P axons show an orientation rule beyond the shuffle (p = 0.020), and full 23P axons don't (p = 0.79). But the difference is not significant (−0.054 [−0.119, +0.017], p = 0.20). Not a finding; at most a lead.
 
+## Sensitivity (2026-10-11 overnight, `scripts/run_session7_sensitivity.sh`, pinned environment)
+
+All fits converged.
+
+**Calibration uncertainty.** `calibrated_truncation.py --profile-boot`: each of 20 reps draws its own target profile by resampling real partial and full 23P/4P axons (within cell type × axon level). Each draw is then used for that rep's branch cuts. The paired bootstrap rotates through the reps, so the CI includes uncertainty in the calibration, the random cuts and the sampling of presynaptic neurons.
+- **Drawn profiles** (mean ± SD across draws, by path bin 0–200 … 800+ µm):
+  - 23P: 0.92 ± 0.03, 0.82 ± 0.04, 0.57 ± 0.04, 0.54 ± 0.05, 0.42 ± 0.09.
+  - 4P: 0.93 ± 0.03, 0.75 ± 0.04, 0.65 ± 0.05, 0.74 ± 0.06, 0.73 ± 0.23.
+- **RF Nsyn shift:** −0.016 [−0.100, +0.046]. The fixed profile gave −0.012 [−0.090, +0.073], and the SD across reps barely changes (0.029 vs 0.030), so the calibration's own uncertainty adds almost nothing. The bound on the realistic bias stays at about ±12% of the rule.
+- **Other models:** RF Nsyn/Ld +0.004 [−0.079, +0.082]; orientation Nsyn +0.001 [−0.015, +0.016].
+- The two test draws earlier (shift ≈ −0.055) were at the tail of this distribution.
+
+**Block size of the random-cable-loss null.** 10 µm and 50 µm cubes, against 25 µm in the main run:
+
+| null cube size | RF Nsyn shift at f = 0.3 | radial − blocks at f = 0.3 (paired) | radial − blocks at f = 0.5 |
+|---|---|---|---|
+| 10 µm | −0.003 [−0.24, +0.19] | −0.27 [−0.52, −0.02] | −0.13 [−0.27, +0.04] |
+| 25 µm (main) | +0.01 [−0.15, +0.16] | −0.28 [−0.47, −0.11] | −0.13 [−0.27, +0.01] |
+| 50 µm | −0.023 [−0.21, +0.18] | −0.25 [−0.47, −0.01] | −0.11 [−0.26, +0.04] |
+
+- **The null stays flat at every cube size and level** (|shift| ≤ 0.03 at every f).
+- **Radial truncation differs from it at f = 0.3 at every cube size.** The CIs are wider for 10 and 50 µm, because those nulls vary more between reps.
+- **Pairing check:** the bootstraps share presynaptic draws across runs (same seeds), and the f = 1 bootstrap slopes are identical across files, which is what makes the radial − blocks contrast across runs valid.
+- **Orientation:** no contrast excludes 0.
+
 ## Revised summary for the preprint
 
 1. Incompleteness *can* bias an inferred wiring rule, but how much depends on the pattern of loss and on each cell type's spatial wiring layout.
    - Cutting axons back uniformly from the far end inflates the RF like-to-like rule by up to 32%. The effect comes from 4P axons, whose RF-similar partners lie near the soma.
    - Random loss of the same amount of cable has no effect.
-2. Simulated with MICrONS's actual partial-proofreading profiles, the bias is ~1% (CI within about ±10%).
+2. Simulated with MICrONS's actual partial-proofreading profiles, the bias is ~1-2%: −0.016 [−0.100, +0.046], including uncertainty in the calibration itself. That is within about ±12% of the rule.
 3. Real partial axons agree with full ones, as the calibrated simulation predicts, but within wide error (about ±30%). The calibrated simulation is what bounds the bias to about ±10%.
 4. **So the published like-to-like rule is robust to the reconstruction incompleteness present in MICrONS.**
    - The method (calibrate a cut model on partial vs. full axons, then simulate) gives an error budget for any wiring rule, which mirrors the Fly project.
@@ -181,8 +206,5 @@ p = 0.010 is the floor for 100 shuffles.
 - **Preprint figure:** `figures/07_truncation_shift.png`.
   - Columns 1–2: shift vs. completeness for radial truncation and both nulls, with the shift beyond the shuffle.
   - Column 3: calibrated prediction vs. real partial − full axons.
-- **Optional rigor for the preprint:**
-  - Ld (Tweedie) bootstrap.
-  - Block-size sensitivity (10 and 50 µm).
-  - Calibration uncertainty: resample the Session 5 profile (bootstrap over partial and full axons), refit the calibrated condition.
+- **Optional:** Ld (Tweedie) bootstrap. Calibration uncertainty and block size are done (see Sensitivity).
 - **Write the preprint around the revised summary above.**
