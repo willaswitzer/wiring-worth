@@ -23,6 +23,11 @@ Conditions written to data/truncation/sets_v1822/ (one set per rep), listed in i
 with the full-axon reference radial_1.00_0:
 - calib     : branch cuts as above; Ld and synapses follow the kept cable.
 - calibblk  : null with the same cable kept per axon as that rep's calib, removed as random 25 um cubes.
+With --profile-boot (calibration uncertainty), each rep instead draws its own target profile: real
+partial and fully extended axons of each cell type are resampled with replacement (within cell type x
+axon level) and the partial/full ratio of mean cable per bin is recomputed from their skeletons; that
+rep's cuts use the drawn profile. Sets are written as condition `calibunc` (no block null), listed in
+index_calibunc.csv; the drawn profiles go to data/truncation/calibunc_profiles_v1822.csv.
 Writes data/truncation/calib_axons_v1822.parquet (per axon x rep: cable kept, synapses kept) and
 data/truncation/calib_profile_v1822.md (achieved vs. target kept-cable profile).
 """
@@ -56,10 +61,34 @@ PROFILE = {  # Session 5, partial/full ratio of mean axon cable per neuron by pa
 BINS_UM = [0, 200, 400, 600, 800, np.inf]
 
 
-def survival(ct):
-    s = np.minimum.accumulate(PROFILE[ct])
+def survival(ct, profile=None):
+    s = np.minimum.accumulate(PROFILE[ct] if profile is None else profile)
     x, y = np.r_[0, BIN_MID_UM], np.r_[1.0, s]
     return lambda d_um: np.interp(d_um, x, y)  # flat beyond the last midpoint
+
+
+def neuron_bin_cable(usable):
+    """Axon cable (um) per path-length bin for every usable 23P/4P neuron with a full or partial axon."""
+    u = usable[usable["cell_type"].isin(list(PROFILE)) &
+               usable["axon_level"].isin(["axon_fully_extended", "axon_partially_extended"])]
+    rows = []
+    for r in u.itertuples():
+        sk = load_skeleton(r.root_id)
+        if sk is None:
+            continue
+        _, ln, pth = resample(sk, AXON)
+        rows.append((r.cell_type, r.axon_level, *(np.histogram(pth / 1e3, bins=BINS_UM, weights=ln)[0] / 1e3)))
+    return pd.DataFrame(rows, columns=["cell_type", "axon_level"] + [f"b{i}" for i in range(len(BINS_UM) - 1)])
+
+
+def draw_profile(cab, ct, rng):
+    """Partial/full ratio of mean cable per bin, neurons resampled within cell type x axon level."""
+    cols = [c for c in cab.columns if c.startswith("b")]
+    means = {}
+    for lvl in ("axon_fully_extended", "axon_partially_extended"):
+        x = cab[(cab["cell_type"] == ct) & (cab["axon_level"] == lvl)][cols].to_numpy()
+        means[lvl] = x[rng.integers(0, len(x), len(x))].mean(axis=0)
+    return means["axon_partially_extended"] / means["axon_fully_extended"]
 
 
 def resample_with_edges(sk, compartment):
@@ -108,6 +137,7 @@ def main():
     ap.add_argument("--reps", type=int, default=20)
     ap.add_argument("--block-um", type=float, default=25.0)
     ap.add_argument("--seed", type=int, default=11)
+    ap.add_argument("--profile-boot", action="store_true", help="draw the target profile per rep (calibration uncertainty)")
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
     t0 = time.time()
@@ -138,10 +168,20 @@ def main():
     print(f"dendrite tree: {len(d_pts):,} pieces; {time.time() - t0:.0f}s", flush=True)
 
     n_post = len(usable)
-    ld = {(c, r): np.zeros((len(pre_ids), n_post), np.float32) for c in ("calib", "calibblk") for r in range(args.reps)}
+    conds = ("calibunc",) if args.profile_boot else ("calib", "calibblk")
+    ld = {(c, r): np.zeros((len(pre_ids), n_post), np.float32) for c in conds for r in range(args.reps)}
     ns = {k: np.zeros((len(pre_ids), n_post), np.int16) for k in ld}
     axon_rows, prof_rows = [], []
-    surv = {ct: survival(ct) for ct in PROFILE}
+    if args.profile_boot:
+        cab = neuron_bin_cable(usable)
+        drawn = {(ct, rep): draw_profile(cab, ct, rng) for rep in range(args.reps) for ct in PROFILE}
+        surv_rep = {k: survival(k[0], v) for k, v in drawn.items()}
+        pd.DataFrame([(ct, rep, *v) for (ct, rep), v in drawn.items()],
+                     columns=["cell_type", "rep"] + [f"bin_{lo}" for lo in BINS_UM[:-1]]).to_csv(
+            OUT / f"calibunc_profiles_v{VERSION}.csv", index=False)
+        print(f"drew {args.reps} profiles per cell type; {time.time() - t0:.0f}s", flush=True)
+    else:
+        surv_rep = {(ct, rep): survival(ct) for ct in PROFILE for rep in range(args.reps)}
 
     for j, r in enumerate(pre_ids):
         ct = pre_meta[r]
@@ -174,21 +214,23 @@ def main():
         full_ns = np.bincount(s_post, minlength=n_post)
         for rep in range(args.reps):
             if ct in PROFILE:
-                keep_a = branch_cut_keep(sk, path_nm, surv[ct], rng)[a_edge]
+                keep_a = branch_cut_keep(sk, path_nm, surv_rep[(ct, rep)], rng)[a_edge]
                 frac = a_len[keep_a].sum() / total
-                ld[("calib", rep)][j] = ld_row(keep_a)
-                ns[("calib", rep)][j] = np.bincount(s_post[keep_a[s_near]], minlength=n_post)
+                ld[(conds[0], rep)][j] = ld_row(keep_a)
+                ns[(conds[0], rep)][j] = np.bincount(s_post[keep_a[s_near]], minlength=n_post)
                 for lo, hi in zip(BINS_UM[:-1], BINS_UM[1:]):
                     m = (a_path / 1e3 >= lo) & (a_path / 1e3 < hi)
                     prof_rows.append((ct, r, rep, lo, a_len[m].sum(), a_len[m & keep_a].sum()))
-                bid, perm, blen = block_order(a_pts, a_len, args.block_um * 1e3, rng)
-                keep_b = blocks_keep(bid, perm, blen, frac)
-                ld[("calibblk", rep)][j] = ld_row(keep_b)
-                ns[("calibblk", rep)][j] = np.bincount(s_post[keep_b[s_near]], minlength=n_post)
+                keep_b = keep_a
+                if not args.profile_boot:
+                    bid, perm, blen = block_order(a_pts, a_len, args.block_um * 1e3, rng)
+                    keep_b = blocks_keep(bid, perm, blen, frac)
+                    ld[("calibblk", rep)][j] = ld_row(keep_b)
+                    ns[("calibblk", rep)][j] = np.bincount(s_post[keep_b[s_near]], minlength=n_post)
                 axon_rows.append((r, ct, rep, frac, keep_a[s_near].sum(), keep_b[s_near].sum(), len(s),
                                   a_len[keep_b].sum() / total))
             else:  # no calibration available: left complete in both conditions
-                for c in ("calib", "calibblk"):
+                for c in conds:
                     ld[(c, rep)][j], ns[(c, rep)][j] = full_ld, full_ns
                 axon_rows.append((r, ct, rep, 1.0, len(s), len(s), len(s), 1.0))
         if (j + 1) % 25 == 0:
@@ -204,11 +246,13 @@ def main():
         pd.DataFrame({"row": rows, "Ld_um": ld[(c, rep)][pj, pk], "Nsyn": ns[(c, rep)][pj, pk]}).to_parquet(
             SET_DIR / f"{name}.parquet")
         index.append((name, c, 0.0, rep))
-    pd.DataFrame(index, columns=["set", "cond", "level", "rep"]).to_csv(SET_DIR / "index_calib.csv", index=False)
+    idx_name = "index_calibunc.csv" if args.profile_boot else "index_calib.csv"
+    pd.DataFrame(index, columns=["set", "cond", "level", "rep"]).to_csv(SET_DIR / idx_name, index=False)
 
     ax = pd.DataFrame(axon_rows, columns=["pre_root_id", "cell_type", "rep", "cable_frac", "n_syn_calib",
                                           "n_syn_calibblk", "n_syn_full", "cable_frac_calibblk"])
-    ax.to_parquet(OUT / f"calib_axons_v{VERSION}.parquet")
+    tag = "calibunc" if args.profile_boot else "calib"
+    ax.to_parquet(OUT / f"{tag}_axons_v{VERSION}.parquet")
     prof = pd.DataFrame(prof_rows, columns=["cell_type", "pre_root_id", "rep", "bin_lo_um", "full_nm", "kept_nm"])
     # achieved partial/full ratio of mean cable per neuron, per bin (the Session 5 statistic)
     g = prof.groupby(["cell_type", "bin_lo_um"]).agg(full=("full_nm", "sum"), kept=("kept_nm", "sum"))
@@ -226,9 +270,9 @@ def main():
            f"of mean axon cable per neuron (4P made non-increasing for the cut model).\n\n"
            f"## Achieved vs. target kept-cable ratio by path bin (all reps)\n\n{g[['achieved', 'target']].to_markdown()}\n\n"
            f"## Per cell type (means over reps)\n\n{by_ct.to_markdown()}\n")
-    (OUT / f"calib_profile_v{VERSION}.md").write_text(txt)
+    (OUT / f"{tag}_profile_v{VERSION}.md").write_text(txt)
     print(txt)
-    print(f"saved {2 * args.reps} sets + index_calib.csv to {SET_DIR.relative_to(ROOT)}/; {time.time() - t0:.0f}s")
+    print(f"saved {len(conds) * args.reps} sets + {idx_name} to {SET_DIR.relative_to(ROOT)}/; {time.time() - t0:.0f}s")
 
 
 if __name__ == "__main__":

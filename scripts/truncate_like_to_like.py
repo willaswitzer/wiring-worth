@@ -90,6 +90,9 @@ def main():
     ap.add_argument("--block-um", type=float, default=25.0)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--limit", type=int, default=0, help="first N axons only (timing test)")
+    ap.add_argument("--only-blocks", default="", metavar="NAME",
+                    help="sensitivity run: write only the block-null sets, as condition NAME (e.g. blocks10), "
+                         "plus radial_1.00_0, listed in index_NAME.csv; the main sets and tables are untouched")
     args = ap.parse_args()
     block_nm = args.block_um * 1e3
     t0 = time.time()
@@ -212,6 +215,20 @@ def main():
     suffix = f"_limit{args.limit}" if args.limit else ""
     set_dir = OUT / f"sets_v{VERSION}{suffix}"
     set_dir.mkdir(exist_ok=True)
+    if args.only_blocks:
+        keep_sets = [k for k in sets if k == ("radial", 1.0, 0) or k[0] == "blocks"]
+        index = []
+        for key in keep_sets:
+            cond = args.only_blocks if key[0] == "blocks" else key[0]
+            name = f"{cond}_{key[1]:.2f}_{key[2]}"
+            if cond != "radial":  # radial_1.00_0 already exists from the main run and is identical
+                pd.DataFrame({"row": rows.astype(np.int32), "Ld_um": ld[key][pj, pk],
+                              "Nsyn": ns[key][pj, pk]}).to_parquet(set_dir / f"{name}.parquet")
+            index.append((name, cond, key[1], key[2]))
+        pd.DataFrame(index, columns=["set", "cond", "level", "rep"]).to_csv(
+            set_dir / f"index_{args.only_blocks}.csv", index=False)
+        print(f"saved {len(index) - 1} {args.only_blocks} sets + index_{args.only_blocks}.csv; {time.time() - t0:.0f}s")
+        return
     index, parts = [], []
     for key in sets:
         name = f"{key[0]}_{key[1]:.2f}_{key[2]}"
