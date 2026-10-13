@@ -8,10 +8,10 @@ Stage 1 -- fetch (needs CAVE access; your Mac):
     .venv/bin/python scripts/edit_history.py fetch [--limit N]
   - presynaptic supervoxel of every output synapse of the 193 fully extended axons (synapses_pni_2 @ v1822)
   - nucleus supervoxel of each of those neurons (nucleus_detection_v0 @ v1822)
-  - for the timestamp of every materialization version of the datastack (expired ones included; from
-    get_versions_metadata), the root id of each synapse supervoxel and each nucleus supervoxel
+  - at the first of every month from --start (default 2021-01) to the pinned version, plus the pinned
+    version's own timestamp, the root id of each synapse supervoxel and each nucleus supervoxel
     (chunkedgraph.get_roots). An output synapse is "attached at t" if its supervoxel's root at t equals
-    the nucleus supervoxel's root at t.
+    the nucleus supervoxel's root at t. Time-point ids are YYYYMM (the pinned one: its version number).
   - for every version that can still be queried, the axon proofreading label of each neuron at that
     version (proofreading table joined through the nucleus id).
   Resumable: one parquet per timestamp in data/history/.
@@ -110,22 +110,28 @@ def fetch(args):
         print(f"WARNING: {bad} nuclei have a different root at v{VERSION} than the usable set; check before trusting them")
     print(f"{len(sv):,} output synapses of {len(pres)} axons; {time.time() - t0:.0f}s", flush=True)
 
-    # timestamps of every version, expired ones included
-    meta = pd.DataFrame(client.materialize.get_versions_metadata(expired=True))
-    meta = meta[["version", "time_stamp"]].drop_duplicates("version").sort_values("version")
-    meta["time_stamp"] = pd.to_datetime(meta["time_stamp"], utc=True)
-    meta = meta[meta["version"] <= VERSION]
-    if args.versions:
-        meta = meta[meta["version"].isin([int(v) for v in args.versions.split(",")])]
+    # time points: the first of every month from --start to the pinned version, plus the pinned version's own
+    # timestamp (its state must equal today's: a check). Version snapshots alone are too coarse -- an axon
+    # can go from unproofread to complete between two releases. A point's id is YYYYMM (pinned: its version).
+    v_meta = pd.DataFrame(client.materialize.get_versions_metadata(expired=True))
+    v_meta["time_stamp"] = pd.to_datetime(v_meta["time_stamp"], utc=True)
+    t_pin = v_meta.loc[v_meta["version"] == VERSION, "time_stamp"].iloc[0]
+    if args.versions:  # test: those versions' timestamps only
+        meta = v_meta[v_meta["version"].isin([int(v) for v in args.versions.split(",")])][["version", "time_stamp"]]
+    else:
+        months = pd.date_range(args.start, t_pin, freq="MS", tz="UTC")
+        meta = pd.DataFrame({"version": [int(m.strftime("%Y%m")) for m in months], "time_stamp": months})
+        meta = pd.concat([meta, pd.DataFrame({"version": [VERSION], "time_stamp": [t_pin]})], ignore_index=True)
+    meta = meta.drop_duplicates("version").sort_values("time_stamp")
     meta.to_csv(HIST / "versions.csv", index=False)
-    print(f"{len(meta)} versions: {meta['version'].tolist()}", flush=True)
+    print(f"{len(meta)} time points, {meta['time_stamp'].min():%Y-%m} to {meta['time_stamp'].max():%Y-%m-%d}", flush=True)
 
     # roots at each timestamp
     sv_ids = sv["sv"].to_numpy(np.uint64)
     pre_of = sv["pre_root_id"].to_numpy(np.int64)
     nuc_sv = pres.set_index("root_id")["nuc_sv"]
     for _, m in meta.iterrows():
-        out = HIST / f"attached_v{int(m.version):04d}.parquet"
+        out = HIST / f"attached_{int(m.version)}.parquet"
         if out.exists():
             continue
         ts = m.time_stamp.to_pydatetime()
@@ -136,13 +142,14 @@ def fetch(args):
         pd.DataFrame({"synapse_id": sv["synapse_id"].to_numpy(), "pre_root_id": pre_of,
                       "attached": attached}).to_parquet(out)
         frac = pd.Series(attached).groupby(pre_of).mean()
-        print(f"  v{int(m.version)} ({ts:%Y-%m-%d}): median {frac.median():.2f} of each axon's outputs attached; "
+        print(f"  {int(m.version)} ({ts:%Y-%m-%d}): median {frac.median():.2f} of each axon's outputs attached; "
               f"{time.time() - t0:.0f}s", flush=True)
 
-    # proofreading labels at each still-queryable version
+    # proofreading labels at each still-queryable (non-expired) version, for reference
     lab_path = HIST / "labels_by_version.parquet"
     labs = []
-    for v in meta["version"]:
+    live = v_meta[(v_meta["version"] <= VERSION) & (v_meta["time_stamp"] >= meta["time_stamp"].min())]["version"]
+    for v in sorted(set(live) - {VERSION} if args.versions else set(live)):
         try:
             n_v = client.materialize.query_table(nuc_table, filter_in_dict={"id": pres["nucleus_id"].tolist()},
                                                  select_columns=["id", "pt_root_id"], materialization_version=int(v))
@@ -175,7 +182,7 @@ def build(args):
     t0 = time.time()
     pres = ref_pres()
     meta = pd.read_csv(HIST / "versions.csv")
-    files = {int(v): HIST / f"attached_v{int(v):04d}.parquet" for v in meta["version"]}
+    files = {int(v): HIST / f"attached_{int(v)}.parquet" for v in meta["version"]}
     files = {v: f for v, f in files.items() if f.exists()}
     att = {v: pd.read_parquet(f).set_index("synapse_id")["attached"] for v, f in files.items()}
     versions = sorted(att)
@@ -243,7 +250,7 @@ def build(args):
     pk = root_idx[pairs["post_root_id"]].to_numpy()
     idx = [("radial_1.00_0", "radial", 1.0, 0)]
     for v in versions:
-        name = f"hist_{v:04d}_0"
+        name = f"hist_{v}_0"
         pd.DataFrame({"row": np.arange(len(pairs), dtype=np.int32), "Ld_um": ld[v][pj, pk],
                       "Nsyn": ns[v][pj, pk]}).to_parquet(SET_DIR / f"{name}.parquet")
         idx.append((name, "hist", float(v), 0))
@@ -252,24 +259,21 @@ def build(args):
     ax = pd.DataFrame(rows, columns=["pre_root_id", "version", "outputs_attached", "cable_attached",
                                      "l2l_syn_attached", "l2l_syn_full"])
     ax = ax.merge(pres.rename(columns={"root_id": "pre_root_id"}), on="pre_root_id")
-    lab_path = HIST / "labels_by_version.parquet"
-    if lab_path.exists():
-        ax = ax.merge(pd.read_parquet(lab_path)[["version", "nucleus_id", "axon_label"]], on=["version", "nucleus_id"],
-                      how="left")
     ax.to_parquet(HIST / f"history_axons_v{VERSION}.parquet")
     meta = meta.set_index("version")
-    summ = ax.groupby("version").agg(axons_complete=("cable_attached", lambda x: (x > 0.95).sum()),
-                                     median_cable=("cable_attached", "median"),
-                                     synapses_kept=("l2l_syn_attached", "sum"), synapses_full=("l2l_syn_full", "sum"))
+    state = pd.cut(ax["cable_attached"], [-0.01, 0.1, 0.95, 1.01], labels=["unproofread (<10%)", "partial", "complete (>95%)"])
+    summ = ax.assign(state=state).pivot_table(index="version", columns="state", values="pre_root_id", aggfunc="count",
+                                              observed=False).fillna(0).astype(int)
+    summ = summ.join(ax.groupby("version").agg(median_cable=("cable_attached", "median"),
+                                               synapses_kept=("l2l_syn_attached", "sum"),
+                                               synapses_full=("l2l_syn_full", "sum")))
     summ["date"] = pd.to_datetime(meta.loc[summ.index, "time_stamp"]).dt.strftime("%Y-%m-%d")
-    if "axon_label" in ax:
-        lab = ax.pivot_table(index="version", columns="axon_label", values="pre_root_id", aggfunc="count").fillna(0)
-        summ = summ.join(lab.astype(int))
+    summ = summ.sort_values("date")
     (ROOT / "notebooks" / "08_history_summary.md").write_text(
         f"# Proofreading history of the {len(pre_ids)} fully extended axons (auto-generated by "
-        f"scripts/edit_history.py build, v{VERSION})\n\nPer materialization version: axons with > 95% of today's "
-        f"cable attached, median cable fraction attached, l2l synapses attached vs today, and axon labels at that "
-        f"version where the tables could be queried.\n\n" + summ.to_markdown() + "\n")
+        f"scripts/edit_history.py build, v{VERSION})\n\nPer time point (YYYYMM; the pinned version last): axons by "
+        f"fraction of today's cable attached (unproofread < 10%, partial, complete > 95%), median fraction, and l2l "
+        f"synapses attached vs today.\n\n" + summ.to_markdown() + "\n")
     print(summ.to_string())
     print(f"saved {len(versions)} hist sets + index_hist.csv; {time.time() - t0:.0f}s")
 
@@ -279,6 +283,7 @@ def main():
     ap.add_argument("stage", choices=["fetch", "build"])
     ap.add_argument("--limit", type=int, default=0, help="fetch: first N axons only (test; writes data/history_test/)")
     ap.add_argument("--versions", default="", help="fetch: comma-separated versions only (test)")
+    ap.add_argument("--start", default="2021-01-01", help="fetch: first monthly time point")
     args = ap.parse_args()
     fetch(args) if args.stage == "fetch" else build(args)
 
