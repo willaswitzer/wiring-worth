@@ -33,7 +33,16 @@ SET_DIR <- sprintf("%s/sets_v%d", TRUNC_DIR, VERSION)
 INDEX_FILE <- Sys.getenv("TRUNC_INDEX", "index.csv")
 TAG <- Sys.getenv("TRUNC_TAG", "")
 PRE_CT <- Sys.getenv("TRUNC_PRE_CT", "")
-SUFFIX <- paste0(if (TAG != "") paste0("_", TAG) else "", if (PRE_CT != "") paste0("_", PRE_CT) else "")
+#   TRUNC_NULL    "cell" (default): postsynaptic functional properties permuted among neurons within cell type x
+#                 area (Session 6). "distance": permuted, separately for each presynaptic neuron, among its
+#                 candidate targets of the same cell type x area AND the same soma-to-soma distance bin
+#                 (DIST_BIN_UM), so the shuffled targets keep the real targets' spatial distribution
+#                 (C. Schneider-Mizell's suggestion). Each pair gets its own draw, so one target neuron can
+#                 carry different properties for different presynaptic neurons.
+NULL_KIND <- Sys.getenv("TRUNC_NULL", "cell")
+DIST_BIN_UM <- as.numeric(Sys.getenv("TRUNC_DIST_BIN_UM", "50"))
+SUFFIX <- paste0(if (TAG != "") paste0("_", TAG) else "", if (PRE_CT != "") paste0("_", PRE_CT) else "",
+                 if (NULL_KIND != "cell") paste0("_null", NULL_KIND) else "")
 main_sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
 sets <- read.csv(file.path(SET_DIR, INDEX_FILE), stringsAsFactors = FALSE)
 sets$level <- round(sets$level, 2)
@@ -159,6 +168,25 @@ run_fit <- function(track, workers, max_sets = Inf) {
 }
 
 # ---------------------------------------------------------------- perm: shuffled control on radial sets
+# distance-matched null: groups of pairs that may exchange postsynaptic properties
+DIST_GROUP <- as.integer(factor(paste(pairs$pre_root_id, pairs$post_cell_type, pairs$post_area,
+                                      floor(pairs$soma_dist_um / DIST_BIN_UM))))
+similarity_distance_matched <- function(seed) {
+  set.seed(seed)
+  pidx <- post_idx
+  for (g in split(seq_along(pidx), DIST_GROUP)) if (length(g) > 1) pidx[g] <- pidx[g[sample.int(length(g))]]
+  a <- rf_unit(neurons$readout_loc_x[pre_idx], neurons$readout_loc_y[pre_idx])
+  b <- rf_unit(neurons$readout_loc_x[pidx], neurons$readout_loc_y[pidx])
+  rf <- acos(pmin(pmax(rowSums(a * b), -1), 1)) * 180 / pi
+  d <- abs(neurons$pref_ori[pre_idx] - neurons$pref_ori[pidx]) %% 180
+  ori <- pmin(d, 180 - d)
+  ori[!(neurons$gOSI[pre_idx] > GOSI_MIN & neurons$gOSI[pidx] > GOSI_MIN)] <- NA
+  list(rf_dist_deg = rf, ori_diff_deg = ori)
+}
+null_similarity <- function(seed) {
+  if (NULL_KIND == "distance") similarity_distance_matched(seed) else similarity(permute_props(seed))
+}
+
 perm_set <- function(level, perm) {
   # level > 0: the radial set at that level; level 0: a non-radial condition of this index (calibrated
   # truncation), rotating through its reps across permutations
@@ -178,7 +206,7 @@ run_perm_trunc <- function(track, n, workers, levels) {
       j <- jobs[i, ]
       p <- set_pairs(perm_set(j$level, j$perm))
       cbind(level = j$level, perm = j$perm,
-            fit_set(p, TRACK_MODELS[[track]], sim_values = similarity(permute_props(10000 + j$perm))))
+            fit_set(p, TRACK_MODELS[[track]], sim_values = null_similarity(10000 + j$perm)))
     }, mc.cores = workers, mc.preschedule = FALSE)
     ok <- vapply(res, is.data.frame, TRUE)
     if (!all(ok)) cat("worker errors:", sum(!ok), "\n")
