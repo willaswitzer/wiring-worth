@@ -265,6 +265,7 @@ def build(args):
     state = pd.cut(ax["cable_attached"], [-0.01, 0.1, 0.95, 1.01], labels=["unproofread (<10%)", "partial", "complete (>95%)"])
     summ = ax.assign(state=state).pivot_table(index="version", columns="state", values="pre_root_id", aggfunc="count",
                                               observed=False).fillna(0).astype(int)
+    summ.columns = [str(c) for c in summ.columns]  # plain labels (a categorical column index cannot be joined)
     summ = summ.join(ax.groupby("version").agg(median_cable=("cable_attached", "median"),
                                                synapses_kept=("l2l_syn_attached", "sum"),
                                                synapses_full=("l2l_syn_full", "sum")))
