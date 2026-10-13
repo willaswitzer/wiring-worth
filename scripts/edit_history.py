@@ -119,7 +119,8 @@ def fetch(args):
     if args.versions:  # test: those versions' timestamps only
         meta = v_meta[v_meta["version"].isin([int(v) for v in args.versions.split(",")])][["version", "time_stamp"]]
     else:
-        months = pd.date_range(args.start, t_pin, freq="MS", tz="UTC")
+        start = pd.Timestamp(args.start).tz_localize("UTC")
+        months = pd.date_range(start, pd.Timestamp(t_pin).tz_convert("UTC"), freq="MS")
         meta = pd.DataFrame({"version": [int(m.strftime("%Y%m")) for m in months], "time_stamp": months})
         meta = pd.concat([meta, pd.DataFrame({"version": [VERSION], "time_stamp": [t_pin]})], ignore_index=True)
     meta = meta.drop_duplicates("version").sort_values("time_stamp")
