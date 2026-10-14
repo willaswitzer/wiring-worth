@@ -46,6 +46,12 @@ SUFFIX <- paste0(if (TAG != "") paste0("_", TAG) else "", if (PRE_CT != "") past
 main_sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
 sets <- read.csv(file.path(SET_DIR, INDEX_FILE), stringsAsFactors = FALSE)
 sets$level <- round(sets$level, 2)
+#   TRUNC_LEVELS  comma-separated levels to keep from the index (e.g. history time points "202304,202511,1822");
+#                 the full-axon reference radial_1.00_0 is always kept
+if (Sys.getenv("TRUNC_LEVELS") != "") {
+  keep_lv <- round(as.numeric(strsplit(Sys.getenv("TRUNC_LEVELS"), ",")[[1]]), 2)
+  sets <- sets[sets$set == "radial_1.00_0" | sets$level %in% keep_lv, ]
+}
 sets <- sets[order(sets$cond != "radial", -sets$level, sets$cond, sets$rep), ]
 
 # Projection types: Ding's inclusion rule (> 30 synapses, > 5 presynaptic neurons with synapses,
@@ -188,8 +194,10 @@ null_similarity <- function(seed) {
 }
 
 perm_set <- function(level, perm) {
-  # level > 0: the radial set at that level; level 0: a non-radial condition of this index (calibrated
-  # truncation), rotating through its reps across permutations
+  # a level held by exactly one set of this index (a radial level, or a history time point) -> that set;
+  # level 0: a non-radial condition of this index (calibrated truncation), rotating through its reps
+  hit <- sets$set[sets$level == round(level, 2)]
+  if (length(hit) == 1) return(hit)
   if (level > 0) return(sprintf("radial_%.2f_0", level))
   nr <- sets[sets$cond != "radial", ]
   cond <- nr$cond[1]
