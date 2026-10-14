@@ -42,7 +42,8 @@ PRE_CT <- Sys.getenv("TRUNC_PRE_CT", "")
 NULL_KIND <- Sys.getenv("TRUNC_NULL", "cell")
 DIST_BIN_UM <- as.numeric(Sys.getenv("TRUNC_DIST_BIN_UM", "50"))
 SUFFIX <- paste0(if (TAG != "") paste0("_", TAG) else "", if (PRE_CT != "") paste0("_", PRE_CT) else "",
-                 if (NULL_KIND != "cell") paste0("_null", NULL_KIND) else "")
+                 if (NULL_KIND != "cell") paste0("_null", NULL_KIND) else "",
+                 if (NULL_KIND == "distance" && DIST_BIN_UM != 50) paste0("_bin", DIST_BIN_UM) else "")
 main_sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
 sets <- read.csv(file.path(SET_DIR, INDEX_FILE), stringsAsFactors = FALSE)
 sets$level <- round(sets$level, 2)
