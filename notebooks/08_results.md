@@ -82,10 +82,16 @@ The old null permuted postsynaptic functional properties among neurons of the sa
 3. **Incompleteness weakens the orientation rule and costs power.** Orientation like-to-like is beyond the distance-matched null on complete axons (p = 0.005). On the plateau-era axons it is weaker (−0.028 to −0.037) and not significant against either null (p = 0.10–0.11 distance-matched; 0.035–0.055 cell-type). A study run on the 2023–2025 data would have reported at most a borderline orientation rule.
 4. **What this replaces in Session 7:**
     - The ~2% "realistic bias" from random branch cuts was a model of the wrong mechanism. The real history gives about 10% for RF.
-    - Radial truncation's 4P-specific inflation is consistent with distance: under the distance-matched null, the inflation is gone.
+    - Pooled radial truncation's inflation is absorbed by the distance-matched null, consistent with the 4P/thalamic-input explanation. A distance-matched null within 4P and 23P separately has not been run.
 5. **For the preprint:**
     - The headline becomes "proofreading incompleteness inflated the RF rule by ~10% through spatial sampling and weakened the orientation rule; a distance-matched null removes the first and is needed to see the second."
     - The baseline must be reported against the distance-matched null as well as the cell-type null.
+
+## Figure
+
+`figures/08_history.png` (`scripts/figure_history.py`; values in `notebooks/08_figure_table.md`). It is Figure 1 of the preprint; the Session 7 truncation figure becomes Figure 2.
+
+- Radial truncation strengthens the orientation rule (gap −0.048 at f = 0.5), while the real history weakened it, so a radial cutoff does not explain the orientation effect.
 
 ## Caveats
 
