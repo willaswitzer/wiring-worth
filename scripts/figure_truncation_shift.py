@@ -16,10 +16,14 @@ of its cable:
   shuffled-wiring control does not also show.
 The dotted vertical line marks the cable ratio of real partially extended 23P axons (~0.75, Session 5).
 
-Third column (if the calibrated and partial-vs-full outputs exist), Nsyn only: the bias predicted by
-calibrated truncation (branch cuts matching real partial axons; pooled with 95% paired bootstrap, and per
-cell type with the range over 20 reps) next to the observed slope difference between real partially and
-fully extended axons of the same cell type (95% bootstrap over presynaptic neurons).
+Open diamonds: the same quantity against the distance-matched shuffle (Session 8; targets permuted only
+within the same 50 um soma-distance bin), i.e. the part of the shift that is not spatial sampling.
+
+Third column (Session 9, if the per-cell-type outputs exist), Nsyn only: the like-to-like slope beyond the
+distance-matched shuffle (real - shuffled mean; bars = 95% range of the shuffle) for 4P and 23P presynaptic
+axons separately, on complete axons and at radial f = 0.3.
+(Session 7's third column, the calibrated branch-cut prediction, moved to the supplement: the real
+proofreading history (Figure 1) replaced it as the model of realistic incompleteness.)
 """
 import sys
 from pathlib import Path
@@ -39,6 +43,8 @@ PROJ = "V1->V1"
 PARTIAL_23P_CABLE = 0.75  # partial/full median axon cable, 23P (Session 5, 05_results.md)
 SIMS = {"rf_dist_deg": "RF-centre distance", "ori_diff_deg": "Orientation difference"}
 MODELS = {"Nsyn": "Synapses (Nsyn)", "density": "Synapses per contact (Nsyn / Ld)"}
+DIST_COL = "#8c5fc7"  # distance-matched shuffle, as in Figure 1
+CTS = ("4P", "23P")
 COND = {  # validated categorical slots 1-3 (dataviz palette, light surface); markers/dashes as secondary encoding
     "radial": ("#2a78d6", "o", "-", "radial truncation"),
     "blocks": ("#eb6834", "s", "--", "random cable loss"),
@@ -47,56 +53,46 @@ COND = {  # validated categorical slots 1-3 (dataviz palette, light surface); ma
 INK, MUTED, GRID, SURFACE = "#1f1f1e", "#6b6a63", "#e4e3dd", "#fcfcfb"
 
 
-def load_calibration():
-    files = ["trunc_slopes_poisson_calib.csv", "trunc_boot_poisson_calib.csv", "partial_vs_full.csv",
-             "partial_vs_full_boot.csv"] + [f"trunc_slopes_poisson_calib_{ct}.csv" for ct in ("23P", "4P")]
+def load_celltype():
+    """Real minus distance-matched shuffle, per presynaptic cell type, at f = 1 and 0.3 (Session 9)."""
+    files = [f"trunc_slopes_poisson_{ct}.csv" for ct in CTS] + [f"trunc_perm_poisson_{ct}_nulldistance.csv" for ct in CTS]
     if not all((TD / f).exists() for f in files):
         return None
-    out = {}
-    f = pd.read_csv(TD / "trunc_slopes_poisson_calib.csv")
-    f = f[(f["proj"] == PROJ) & (f["model"] == "Nsyn")]
-    ref = f[f["set"] == "radial_1.00_0"].set_index("sim")["slope"]
-    b = pd.read_csv(TD / "trunc_boot_poisson_calib.csv")
-    b = b[(b["proj"] == PROJ) & (b["model"] == "Nsyn")]
-    bref = b[b["set"] == "radial_1.00_0"].set_index(["boot", "sim"])["slope"].rename("r")
-    b = b.join(bref, on=["boot", "sim"])
-    b["shift"] = b["slope"] - b["r"]
-    for sim in SIMS:
-        est = f[(f["cond"] == "calib") & (f["sim"] == sim)]["slope"].mean() - ref[sim]
-        q = b[(b["cond"] == "calib") & (b["sim"] == sim)]["shift"].quantile([.025, .975]).to_numpy()
-        out[("pooled", sim)] = (est, q[0], q[1])
-        for ct in ("23P", "4P"):
-            c = pd.read_csv(TD / f"trunc_slopes_poisson_calib_{ct}.csv")
-            c = c[(c["proj"] == PROJ) & (c["model"] == "Nsyn") & (c["sim"] == sim)]
-            r = c[c["set"] == "radial_1.00_0"]["slope"].iloc[0]
-            sh = c[c["cond"] == "calib"]["slope"] - r
-            out[("pred", ct, sim)] = (sh.mean(), sh.min(), sh.max())
-    e = pd.read_csv(TD / "partial_vs_full.csv")
-    e = e[(e["model"] == "Nsyn") & (e["variant"] == "main")]
-    bb = pd.read_csv(TD / "partial_vs_full_boot.csv")
-    bb = bb[(bb["model"] == "Nsyn") & (bb["variant"] == "main")]
-    for _, r in e.iterrows():
-        q = bb[(bb["cell_type"] == r["cell_type"]) & (bb["sim"] == r["sim"])]["diff"].quantile([.025, .975]).to_numpy()
-        out[("obs", r["cell_type"], r["sim"])] = (r["diff"], q[0], q[1])
-    return out
+    rows = []
+    for ct in CTS:
+        f = pd.read_csv(TD / f"trunc_slopes_poisson_{ct}.csv")
+        f = f[(f["proj"] == PROJ) & (f["model"] == "Nsyn") & (f["cond"] == "radial")]
+        f["level"] = f["level"].round(2)
+        pm = pd.read_csv(TD / f"trunc_perm_poisson_{ct}_nulldistance.csv")
+        pm = pm[(pm["proj"] == PROJ) & (pm["model"] == "Nsyn")]
+        pm["level"] = pm["level"].round(2)
+        for sim in SIMS:
+            for lv in (1.0, 0.3):
+                r = f[(f["sim"] == sim) & (f["level"] == lv)]["slope"].iloc[0]
+                v = pm[(pm["sim"] == sim) & (pm["level"] == lv)]["slope"].dropna().to_numpy()
+                mu = v.mean()
+                p = (1 + (abs(v - mu) >= abs(r - mu)).sum()) / (1 + len(v))
+                rows.append(dict(cell_type=ct, sim=sim, level=lv, real=r, null=mu, gap=r - mu,
+                                 lo=r - pd.Series(v).quantile(.975), hi=r - pd.Series(v).quantile(.025), p=p, n=len(v)))
+    return pd.DataFrame(rows)
 
 
-def validation_panel(ax, cal, sim, top):
-    """Predicted (calibrated) vs observed (real partial - full) shift, Nsyn, per cell type."""
+def celltype_panel(ax, ctab, sim, top):
     ax.axhline(0, color=MUTED, lw=.8, zorder=1)
-    items = [("pooled", 0, cal[("pooled", sim)], INK, "*", "calibrated, predicted (pooled)")]
-    for k, ct in enumerate(("23P", "4P")):
-        items.append((ct, 1 + 1.2 * k, cal[("pred", ct, sim)], INK, "o", "calibrated, predicted (cell type)"))
-        items.append((ct, 1.45 + 1.2 * k, cal[("obs", ct, sim)], COND["radial"][0], "D", "real partial − full axons"))
-    for _, x, (y, lo, hi), col, mk, lab in items:
-        ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt=mk, color=col, ms=11 if mk == "*" else 5.5,
-                    capsize=2.5, lw=1.2, markeredgecolor="white", markeredgewidth=.6, label=lab, zorder=3)
-    ax.set_xticks([0, 1.22, 2.42], ["all", "23P", "4P"])
-    ax.set_xlim(-.5, 2.95)
+    for k, ct in enumerate(CTS):
+        for m, (lv, mk, fc) in enumerate(((1.0, "o", DIST_COL), (0.3, "o", "white"))):
+            r = ctab[(ctab["cell_type"] == ct) & (ctab["sim"] == sim) & (ctab["level"] == lv)].iloc[0]
+            x = k + (m - .5) * .36
+            ax.errorbar([x], [r["gap"]], yerr=[[r["gap"] - r["lo"]], [r["hi"] - r["gap"]]], fmt=mk, color=DIST_COL,
+                        mfc=fc, ms=5.5, capsize=2.5, lw=1.2, zorder=3,
+                        label="complete axons" if lv == 1 else "radial f = 0.3")
+    ax.set_xticks(range(len(CTS)), [f"{ct} axons" for ct in CTS])
+    ax.set_xlim(-.6, len(CTS) - .4)
     ax.grid(axis="y", color=GRID, lw=.6, zorder=0)
     ax.spines[["top", "right"]].set_visible(False)
+    ax.set_ylabel("real − distance-matched shuffle", fontsize=8, color=INK)
     if top:
-        ax.set_title("Realistic incompleteness\n(Nsyn)", fontsize=9.5, color=INK)
+        ax.set_title("Beyond distance, by cell type\n(Nsyn)", fontsize=9.5, color=INK)
 
 
 def main():
@@ -133,12 +129,21 @@ def main():
     gap["gap"] = gap["slope"] - gap["null"]
     gap = gap.join(gap[gap["level"] == 1].set_index(key)["gap"].rename("gap1"), on=key)
     gap["gap_shift"] = gap["gap"] - gap["gap1"]
+    gapd = None
+    if (TD / "trunc_perm_poisson_nulldistance.csv").exists():
+        pd_ = pd.read_csv(TD / "trunc_perm_poisson_nulldistance.csv")
+        pd_["level"] = pd_["level"].round(2)
+        pd_ = pd_[pd_["proj"] == PROJ]
+        gapd = pd_.groupby(key + ["level"])["slope"].mean().rename("null").reset_index().merge(real, on=key + ["level"])
+        gapd["gap"] = gapd["slope"] - gapd["null"]
+        gapd = gapd.join(gapd[gapd["level"] == 1].set_index(key)["gap"].rename("gap1"), on=key)
+        gapd["gap_shift"] = gapd["gap"] - gapd["gap1"]
 
     # ------------------------------------------------------------ figure
     plt.rcParams.update({"font.size": 9, "axes.edgecolor": MUTED, "axes.labelcolor": INK, "xtick.color": MUTED,
                          "ytick.color": MUTED, "font.family": "DejaVu Sans"})
-    calib = load_calibration()
-    ncol = 3 if calib is not None else 2
+    ctab = load_celltype()
+    ncol = 3 if ctab is not None else 2
     fig, axes = plt.subplots(2, ncol, figsize=(3.6 * ncol, 6.0), squeeze=False,
                              gridspec_kw={"width_ratios": [1, 1, .62][:ncol]})
     for i, sim in enumerate(SIMS):
@@ -153,7 +158,11 @@ def main():
                         markeredgecolor="white", markeredgewidth=.6)
             g = gap[(gap["sim"] == sim) & (gap["model"] == model)].sort_values("level")
             ax.plot(g["level"], g["gap_shift"], ls="none", marker="D", ms=5.5, color=INK, markeredgecolor="white",
-                    markeredgewidth=.6, zorder=4, label="radial, beyond shuffled wiring")
+                    markeredgewidth=.6, zorder=4, label="radial, beyond cell-type shuffle")
+            if gapd is not None:
+                g = gapd[(gapd["sim"] == sim) & (gapd["model"] == model)].sort_values("level")
+                ax.plot(g["level"], g["gap_shift"], ls="none", marker="D", ms=5.5, color=DIST_COL, mfc="white",
+                        markeredgewidth=1.3, zorder=5, label="radial, beyond distance-matched shuffle")
             ax.set_xlim(1.03, 0.27)
             ax.grid(axis="y", color=GRID, lw=.6, zorder=0)
             ax.spines[["top", "right"]].set_visible(False)
@@ -166,9 +175,9 @@ def main():
             if i == 0 and j == 0:
                 ax.annotate("real 23P\npartial axons", xy=(PARTIAL_23P_CABLE, ax.get_ylim()[1]), xytext=(3, -2),
                             textcoords="offset points", fontsize=7.5, color=MUTED, va="top")
-    if calib is not None:
+    if ctab is not None:
         for i, sim in enumerate(SIMS):
-            validation_panel(axes[i, 2], calib, sim, top=i == 0)
+            celltype_panel(axes[i, 2], ctab, sim, top=i == 0)
     h, lab = [], []
     for a in axes.ravel():
         for hh, ll in zip(*a.get_legend_handles_labels()):
@@ -190,14 +199,18 @@ def main():
     for (sim, model, level), r in t.iterrows():
         cell = {c: f"{r[('shift', c)]:+.3f} [{r[('lo', c)]:+.3f}, {r[('hi', c)]:+.3f}]" for c in COND}
         gs = gap[(gap["sim"] == sim) & (gap["model"] == model) & (gap["level"] == level)]["gap_shift"]
+        gd = gapd[(gapd["sim"] == sim) & (gapd["model"] == model) & (gapd["level"] == level)]["gap_shift"] if gapd is not None else []
         rows.append({"similarity": SIMS[sim], "model": MODELS[model], "f": level, **cell,
-                     "radial beyond shuffle": f"{gs.iloc[0]:+.3f}" if len(gs) else ""})
+                     "radial beyond cell-type shuffle": f"{gs.iloc[0]:+.3f}" if len(gs) else "",
+                     "radial beyond distance-matched shuffle": f"{gd.iloc[0]:+.3f}" if len(gd) else ""})
     tab = pd.DataFrame(rows).sort_values(["similarity", "model", "f"], ascending=[False, True, False])
     (ROOT / "notebooks" / "07_shift_table.md").write_text(
         f"# Slope shift vs. completeness (auto-generated by scripts/figure_truncation_shift.py, v{VERSION})\n\n"
         f"{PROJ}; slope(f) - slope(1) per 10°, log scale; full-data estimate [95% paired bootstrap, "
-        f"{boot['boot'].nunique()} samples]. 'radial beyond shuffle' = change in (real - shuffled mean) since f = 1.\n\n"
-        + tab.to_markdown(index=False) + "\n")
+        f"{boot['boot'].nunique()} samples]. 'beyond ... shuffle' = change in (real - shuffled mean) since f = 1.\n\n"
+        + tab.to_markdown(index=False) + "\n"
+        + ("" if ctab is None else "\n## Beyond the distance-matched shuffle, by presynaptic cell type (Nsyn)\n\n"
+           + ctab.assign(similarity=ctab["sim"].map(SIMS)).drop(columns="sim").round(3).to_markdown(index=False) + "\n"))
     print("saved figures/07_truncation_shift.png/.pdf, notebooks/07_shift_table.md")
     print(tab.to_string(index=False))
 

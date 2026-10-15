@@ -82,7 +82,7 @@ def null_summary(path, level):
 
 
 real_lookup = {}
-for lv in (202304, 202511):
+for lv in (202304, 202511, 202602):
     real_lookup[f"hist_{lv}"] = real_hist[real_hist.level == lv].set_index("sim").slope
 real_lookup["complete"] = full
 rad = v1(pd.read_csv(T / "trunc_slopes_poisson.csv"))
@@ -96,10 +96,13 @@ states = [  # key, label, distance-null (file, level), cell-null (file, level)
     ("complete", "complete\n(v1822)", (T / "trunc_perm_poisson_nulldistance.csv", 1.0), (T / "trunc_perm_poisson.csv", 1.0)),
     ("hist_202304", "history\nApr 2023", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202304), (T / "trunc_perm_poisson_hist.csv", 202304)),
     ("hist_202511", "history\nNov 2025", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202511), (T / "trunc_perm_poisson_hist.csv", 202511)),
+    ("hist_202602", "history\nFeb 2026", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202602), (T / "trunc_perm_poisson_hist.csv", 202602)),
     ("calib", "branch\ncuts", (T / "trunc_perm_poisson_calib_nulldistance.csv", 0), (T / "trunc_perm_poisson_calib.csv", 0)),
     ("radial_0.5", "radial\nf = 0.5", (T / "trunc_perm_poisson_nulldistance.csv", 0.5), (T / "trunc_perm_poisson.csv", 0.5)),
     ("radial_0.3", "radial\nf = 0.3", (T / "trunc_perm_poisson_nulldistance.csv", 0.3), (T / "trunc_perm_poisson.csv", 0.3)),
 ]
+# drop states whose shuffles haven't been run yet (Feb 2026 is added by scripts/run_session10.sh)
+states = [st for st in states if st[2][0].exists() and (pd.read_csv(st[2][0], usecols=["level"]).level.round(2) == round(st[2][1], 2)).any()]
 rows = []
 for key, label, dn, cn in states:
     for nullname, (path, lv) in (("distance", dn), ("cell", cn)):
