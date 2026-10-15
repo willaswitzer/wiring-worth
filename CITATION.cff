@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it as below."
+title: "wiring-worth: proofreading completeness and the like-to-like rule in MICrONS"
+authors:
+  - family-names: Switzer
+    given-names: Willa
+license: MIT
+repository-code: "https://github.com/willaswitzer/wiring-worth"
+version: 0.1.0
+date-released: 2026-10-15
+keywords:
+  - connectomics
+  - MICrONS
+  - mouse visual cortex
+  - proofreading
+  - like-to-like connectivity
