@@ -28,7 +28,11 @@ suppressPackageStartupMessages({
 })
 
 VERSION <- 1822
-OUT_DIR <- "data/like_to_like"
+# L2L_TAG (Session 10, match-rule sensitivity): read data/l2l_{pairs,neurons}_v1822_<tag>.parquet from
+# scripts/prepare_like_to_like.py <tag> and write to data/like_to_like_<tag>/. Unset = main analysis.
+L2L_TAG <- Sys.getenv("L2L_TAG", "")
+L2L_SFX <- if (L2L_TAG != "") paste0("_", L2L_TAG) else ""
+OUT_DIR <- paste0("data/like_to_like", L2L_SFX)
 dir.create(OUT_DIR, showWarnings = FALSE)
 MONITOR_W_CM <- 56.5; MONITOR_H_CM <- 31.8; EYE_CM <- 15.0  # MICrONS Consortium 2025, Methods
 GOSI_MIN <- 0.25
@@ -43,8 +47,8 @@ VARIANTS <- list(
 )
 
 # ---------------------------------------------------------------- data
-pairs <- as.data.frame(read_parquet(sprintf("data/l2l_pairs_v%d.parquet", VERSION)))
-neurons <- as.data.frame(read_parquet(sprintf("data/l2l_neurons_v%d.parquet", VERSION)))
+pairs <- as.data.frame(read_parquet(sprintf("data/l2l_pairs_v%d%s.parquet", VERSION, L2L_SFX)))
+neurons <- as.data.frame(read_parquet(sprintf("data/l2l_neurons_v%d%s.parquet", VERSION, L2L_SFX)))
 pairs$pre_root_id <- as.character(pairs$pre_root_id)
 pairs$post_root_id <- as.character(pairs$post_root_id)
 neurons$root_id <- as.character(neurons$root_id)
