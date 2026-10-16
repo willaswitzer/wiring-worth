@@ -8,8 +8,8 @@ D/E  real minus shuffled-wiring slope across states: distance-matched vs. cell-t
 Inputs (data/truncation/, data/history/):
   trunc_slopes_poisson_hist.csv, trunc_boot_poisson_hist.csv,
   trunc_perm_poisson_hist{,_nulldistance}.csv, trunc_perm_poisson{,_nulldistance}.csv,
-  trunc_perm_poisson_calib{,_nulldistance}.csv, trunc_slopes_poisson.csv,
-  trunc_slopes_poisson_calib.csv, history_axons_v1822.parquet
+  trunc_perm_poisson_cyl{,_nulldistance}.csv, trunc_slopes_poisson.csv,
+  trunc_slopes_poisson_cyl.csv, history_axons_v1822.parquet
 Outputs: figures/08_history.png/.pdf, notebooks/08_figure_table.md
 """
 import argparse
@@ -89,16 +89,17 @@ rad = v1(pd.read_csv(T / "trunc_slopes_poisson.csv"))
 rad = rad[rad.cond == "radial"]
 for f in (0.5, 0.3):
     real_lookup[f"radial_{f}"] = rad[np.isclose(rad.level, f)].groupby("sim").slope.mean()
-cal = v1(pd.read_csv(T / "trunc_slopes_poisson_calib.csv"))
-real_lookup["calib"] = cal[cal.cond == "calib"].groupby("sim").slope.mean()
+cyl_f = T / "trunc_slopes_poisson_cyl.csv"  # Session 11: column cylinder, Rc = 100 um
+if cyl_f.exists():
+    cyl = v1(pd.read_csv(cyl_f))
+    real_lookup["cyl_100"] = cyl[(cyl.cond == "cyl") & np.isclose(cyl.level, 100)].set_index("sim").slope
 
 states = [  # key, label, distance-null (file, level), cell-null (file, level)
-    ("complete", "complete\n(v1822)", (T / "trunc_perm_poisson_nulldistance.csv", 1.0), (T / "trunc_perm_poisson.csv", 1.0)),
-    ("hist_202304", "history\nApr 2023", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202304), (T / "trunc_perm_poisson_hist.csv", 202304)),
-    ("hist_202511", "history\nNov 2025", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202511), (T / "trunc_perm_poisson_hist.csv", 202511)),
-    ("hist_202602", "history\nFeb 2026", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202602), (T / "trunc_perm_poisson_hist.csv", 202602)),
-    ("calib", "branch\ncuts", (T / "trunc_perm_poisson_calib_nulldistance.csv", 0), (T / "trunc_perm_poisson_calib.csv", 0)),
-    ("radial_0.5", "radial\nf = 0.5", (T / "trunc_perm_poisson_nulldistance.csv", 0.5), (T / "trunc_perm_poisson.csv", 0.5)),
+    ("complete", "complete\nv1822", (T / "trunc_perm_poisson_nulldistance.csv", 1.0), (T / "trunc_perm_poisson.csv", 1.0)),
+    ("hist_202304", "Apr\n2023", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202304), (T / "trunc_perm_poisson_hist.csv", 202304)),
+    ("hist_202511", "Nov\n2025", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202511), (T / "trunc_perm_poisson_hist.csv", 202511)),
+    ("hist_202602", "Feb\n2026", (T / "trunc_perm_poisson_hist_nulldistance.csv", 202602), (T / "trunc_perm_poisson_hist.csv", 202602)),
+    ("cyl_100", "column\nRc = 100 µm", (T / "trunc_perm_poisson_cyl_nulldistance.csv", 100), (T / "trunc_perm_poisson_cyl.csv", 100)),
     ("radial_0.3", "radial\nf = 0.3", (T / "trunc_perm_poisson_nulldistance.csv", 0.3), (T / "trunc_perm_poisson.csv", 0.3)),
 ]
 # drop states whose shuffles haven't been run yet (Feb 2026 is added by scripts/run_session10.sh)
@@ -142,7 +143,7 @@ def time_axis(ax):
 
 ax = axA
 time_axis(ax)
-ax.plot(comp.date, comp.syn_frac, color="k", label="V1→V1 synapses")
+ax.plot(comp.date, comp.syn_frac, color="k", label="synapses (all targets)")
 ax.plot(comp.date, comp.cable_med, color="tab:blue", label="median axon cable")
 ax.plot(comp.date, comp.n_complete, color="tab:green", label="axons complete")
 ax.set_ylim(0, 1.03); ax.set_ylabel("fraction attached to soma")
