@@ -19,7 +19,7 @@ For the first of every month from 2021-01 to v1822, each output synapse of each 
 - **Check:** the v1822 state reproduces Session 6 exactly.
 - **Full table:** `notebooks/08_history_summary.md`.
 
-| period | unproofread (< 10% of cable) | partial | complete (> 95%) | median cable attached | V1→V1 synapses attached (of 3,586) |
+| period | unproofread (< 10% of cable) | partial | complete (> 95%) | median cable attached | synapses attached, all targets (of 3,586; 3,353 are V1→V1) |
 |---|---|---|---|---|---|
 | Jan 2021 | 134 | 56 | 3 | 4% | 277 |
 | Mar 2023 (proofreading push) | 25 | 147 | 21 | 33% | 1,758 |
