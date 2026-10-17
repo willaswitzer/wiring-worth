@@ -33,6 +33,8 @@ SET_DIR <- sprintf("%s/sets_v%d", TRUNC_DIR, VERSION)
 INDEX_FILE <- Sys.getenv("TRUNC_INDEX", "index.csv")
 TAG <- Sys.getenv("TRUNC_TAG", "")
 PRE_CT <- Sys.getenv("TRUNC_PRE_CT", "")
+#   TRUNC_POST_CT restrict to postsynaptic targets of one cell type (e.g. "23P"; Session 13); V1->V1 only
+POST_CT <- Sys.getenv("TRUNC_POST_CT", "")
 #   TRUNC_NULL    "cell" (default): postsynaptic functional properties permuted among neurons within cell type x
 #                 area (Session 6). "distance": permuted, separately for each presynaptic neuron, among its
 #                 candidate targets of the same cell type x area AND the same soma-to-soma distance bin
@@ -42,6 +44,7 @@ PRE_CT <- Sys.getenv("TRUNC_PRE_CT", "")
 NULL_KIND <- Sys.getenv("TRUNC_NULL", "cell")
 DIST_BIN_UM <- as.numeric(Sys.getenv("TRUNC_DIST_BIN_UM", "50"))
 SUFFIX <- paste0(if (TAG != "") paste0("_", TAG) else "", if (PRE_CT != "") paste0("_", PRE_CT) else "",
+                 if (POST_CT != "") paste0("_to", POST_CT) else "",
                  if (NULL_KIND != "cell") paste0("_null", NULL_KIND) else "",
                  if (NULL_KIND == "distance" && DIST_BIN_UM != 50) paste0("_bin", DIST_BIN_UM) else "")
 main_sets <- read.csv(file.path(SET_DIR, "index.csv"), stringsAsFactors = FALSE)
@@ -72,7 +75,7 @@ FULL_PROJS <- setNames(lapply(SIMS, function(s) {
   sort(Reduce(intersect, ok))
 }), SIMS)
 rm(radial_pairs)
-if (PRE_CT != "") FULL_PROJS <- lapply(FULL_PROJS, intersect, "V1->V1")
+if (PRE_CT != "" || POST_CT != "") FULL_PROJS <- lapply(FULL_PROJS, intersect, "V1->V1")
 cat("projection types fitted:", paste(names(FULL_PROJS), sapply(FULL_PROJS, paste, collapse = ", "), sep = ": ", collapse = "; "), "\n")
 STARTS <- readRDS(file.path(OUT_DIR, "real_starts.rds"))
 TRACK_MODELS <- list(poisson = c("Nsyn", "density"), tweedie = "Ld")
@@ -93,6 +96,7 @@ model_data <- function(p, sim_name, sim_values) {
   d$sim <- sim_values[[sim_name]] / 10
   d <- d[!is.na(d$sim) & d$proj %in% FULL_PROJS[[sim_name]], ]
   if (PRE_CT != "") d <- d[d$pre_cell_type == PRE_CT, ]
+  if (POST_CT != "") d <- d[d$post_cell_type == POST_CT, ]
   d$proj <- factor(d$proj, levels = FULL_PROJS[[sim_name]])
   d$pre_proj <- droplevels(d$pre_proj)
   d
