@@ -27,12 +27,13 @@ suppressPackageStartupMessages({
   library(parallel)
 })
 
-VERSION <- 1822
+VERSION <- as.integer(Sys.getenv("MICRONS_VERSION", "1822"))  # pinned 1822; the v1926 add-on sets 1926
+VSFX <- if (VERSION != 1822) paste0("_v", VERSION) else ""
 # L2L_TAG (Session 10, match-rule sensitivity): read data/l2l_{pairs,neurons}_v1822_<tag>.parquet from
 # scripts/prepare_like_to_like.py <tag> and write to data/like_to_like_<tag>/. Unset = main analysis.
 L2L_TAG <- Sys.getenv("L2L_TAG", "")
 L2L_SFX <- if (L2L_TAG != "") paste0("_", L2L_TAG) else ""
-OUT_DIR <- paste0("data/like_to_like", L2L_SFX)
+OUT_DIR <- paste0("data/like_to_like", L2L_SFX, VSFX)
 dir.create(OUT_DIR, showWarnings = FALSE)
 MONITOR_W_CM <- 56.5; MONITOR_H_CM <- 31.8; EYE_CM <- 15.0  # MICrONS Consortium 2025, Methods
 GOSI_MIN <- 0.25

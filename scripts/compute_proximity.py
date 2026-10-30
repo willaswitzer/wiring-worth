@@ -33,7 +33,7 @@ from scipy.spatial import cKDTree
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from config import VERSION  # noqa: E402
+from config import VERSION, VSFX  # noqa: E402
 
 DATA = ROOT / "data"
 SKEL_DIR = DATA / "skeletons"
@@ -41,9 +41,9 @@ SKEL_VERSION = 4
 SYN_PATH = DATA / f"synapses_usable_v{VERSION}.parquet"  # input (synapse list); computed columns are replaced
 LABELS = "synapse"
 OUTPUTS = {
-    "synapse": (SYN_PATH, DATA / f"pairs_usable_v{VERSION}.parquet", ROOT / "notebooks" / "05_proximity_counts.md"),
+    "synapse": (SYN_PATH, DATA / f"pairs_usable_v{VERSION}.parquet", ROOT / "notebooks" / f"05_proximity_counts{VSFX}.md"),
     "service": (DATA / f"synapses_usable_v{VERSION}_servicelabels.parquet",
-                DATA / f"pairs_usable_v{VERSION}_servicelabels.parquet", ROOT / "notebooks" / "04_proximity_counts.md"),
+                DATA / f"pairs_usable_v{VERSION}_servicelabels.parquet", ROOT / "notebooks" / f"04_proximity_counts{VSFX}.md"),
 }
 PRE_AXON = ["axon_fully_extended", "axon_partially_extended"]
 AXON, DEND = 2, 3

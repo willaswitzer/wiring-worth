@@ -29,13 +29,13 @@ from scipy.spatial import cKDTree
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from config import VERSION  # noqa: E402
+from config import PINNED, VERSION, VSFX  # noqa: E402
 
 DATA = ROOT / "data"
 SKEL_DIR = DATA / "skeletons"
 SKEL_VERSION = 4
 IO_PATH = DATA / f"synapses_io_usable_v{VERSION}.parquet"
-SUMMARY = SKEL_DIR / "relabel_summary.csv"
+SUMMARY = SKEL_DIR / f"relabel_summary{VSFX}.csv"
 MAX_SYN_DIST = 10_000.0  # nm; synapses farther than this from the skeleton are ignored
 MIN_SI = 0.5             # below this the split is flagged as unreliable
 MAX_CUTS = 5             # first cut + up to 4 extra axon subtrees
@@ -137,7 +137,13 @@ def main():
     usable = pd.read_parquet(DATA / f"usable_set_v{VERSION}_s2.parquet")
     groups = dict(tuple(io.groupby("root_id")))
     rows = []
-    for r in usable["root_id"].astype("int64"):
+    roots = usable["root_id"].astype("int64")
+    if VERSION != PINNED:
+        # root ids are immutable: a root already labelled for the pinned release is the same object with the same
+        # synapses, so keep its labels (and leave the pinned release's files untouched); label only new roots
+        roots = [r for r in roots if not labels_path(r).exists()]
+        print(f"v{VERSION}: {len(roots)} new roots to label")
+    for r in roots:
         z = np.load(SKEL_DIR / f"{r}_sv{SKEL_VERSION}.npz")
         sk = {k: z[k] for k in z.files}
         g = groups.get(r, io.iloc[:0])

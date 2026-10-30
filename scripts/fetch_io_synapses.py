@@ -15,11 +15,11 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from config import DATASTACK, VERSION  # noqa: E402
+from config import DATASTACK, VERSION, VSFX  # noqa: E402
 from caveclient import CAVEclient  # noqa: E402
 
 DATA = ROOT / "data"
-IO_DIR = DATA / "skeletons" / "io"
+IO_DIR = DATA / "skeletons" / f"io{VSFX}"  # chunk cache, one per release
 OUT = DATA / f"synapses_io_usable_v{VERSION}.parquet"
 CHUNK = 10
 WORKERS = 4

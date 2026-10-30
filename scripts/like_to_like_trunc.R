@@ -20,7 +20,7 @@
 
 suppressPackageStartupMessages(source("scripts/like_to_like.R"))
 
-TRUNC_DIR <- "data/truncation"
+TRUNC_DIR <- paste0("data/truncation", VSFX)  # VSFX from like_to_like.R ("" for the pinned release)
 LD_LEVELS <- c(1, 0.7, 0.5, 0.3)
 VARIANT <- "main"
 COVARS <- VARIANTS[[VARIANT]]$covars

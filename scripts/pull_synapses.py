@@ -15,12 +15,12 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from config import DATASTACK, VERSION  # noqa: E402
+from config import DATASTACK, VERSION, VSFX  # noqa: E402
 from caveclient import CAVEclient  # noqa: E402
 
 DATA = ROOT / "data"
 OUT = DATA / f"synapses_usable_v{VERSION}.parquet"
-COUNTS_MD = ROOT / "notebooks" / "03_synapse_counts.md"
+COUNTS_MD = ROOT / "notebooks" / f"03_synapse_counts{VSFX}.md"
 PRE_AXON = ["axon_fully_extended", "axon_partially_extended"]
 CHUNK = 25  # presynaptic roots per query
 

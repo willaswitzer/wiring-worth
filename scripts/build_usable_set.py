@@ -23,11 +23,11 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from config import DATASTACK, VERSION  # noqa: E402
+from config import DATASTACK, PINNED, VERSION, VSFX  # noqa: E402
 
 DATA = ROOT / "data"
 OUT = DATA / f"usable_set_v{VERSION}_s2.parquet"
-COUNTS_MD = ROOT / "notebooks" / "02_counts.md"
+COUNTS_MD = ROOT / "notebooks" / f"02_counts{VSFX}.md"
 
 COREG = "coregistration_manual_v4"
 FUNC = "digital_twin_properties_bcm_coreg_v4"
@@ -49,7 +49,8 @@ from caveclient import CAVEclient  # noqa: E402
 
 client = CAVEclient(DATASTACK, version=VERSION)
 usable = load("proofread_coreg_manual").rename(columns={"valid_id": "proofread_root_id"})
-assert len(usable) == 1059, len(usable)
+assert VERSION != PINNED or len(usable) == 1059, len(usable)
+print(f"v{VERSION}: {len(usable)} proofread + co-registered neurons")
 
 # Root ids: proofreading_status_and_strategy records the root that was assessed (valid_id)
 # and its v1822 root (pt_root_id). Everything downstream joins on the v1822 root.
@@ -64,7 +65,10 @@ for r in changed.itertuples():
                          in_session1_set=r.pt_root_id in set(usable["pt_root_id"])))
 root_log = pd.DataFrame(root_log)
 print("Root ids changed since proofreading:\n", root_log.to_string(index=False), "\n")
-assert root_log["lineage_confirms"].all()
+if VERSION == PINNED:
+    assert root_log["lineage_confirms"].all()
+elif len(root_log) and not root_log["lineage_confirms"].all():
+    print(f"WARNING v{VERSION}: {(~root_log['lineage_confirms']).sum()} changed roots not confirmed by lineage (logged only)")
 
 # Cell-type corrections: keyed by nucleus id (target_id). Apply to all rows; log what changes.
 corr = client.materialize.query_table(CT_CORR)
