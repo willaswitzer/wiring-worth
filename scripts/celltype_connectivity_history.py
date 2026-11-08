@@ -15,7 +15,11 @@ States: complete (v1822), Apr 2023, Nov 2025, Feb 2026 (presynaptic rollback, hi
 loss (each axon keeps a random subset of its synapses of its Nov 2025 size; 20 reps). Shift CIs: paired bootstrap
 over presynaptic axons. Partial extension did not follow axons to layer 5 and below (C. Schneider-Mizell), so
 connections onto 5P targets are the expected casualty.
-Writes notebooks/14_celltype_connectivity.md.
+Estimability: a stratified estimate is reported only if at least MIN_STRATA strata contribute to both the MH
+numerator (A connected, B unconnected) and denominator (A unconnected, B connected) in the complete state; otherwise
+"n/e". Bootstrap samples where a log OR is undefined (0 or infinite odds ratio) are dropped and their share is
+reported when non-zero.
+Writes notebooks/14_celltype_connectivity.md and data/celltype_history/{shifts,attachment_by_depth}_v<VERSION>.csv.
 """
 import argparse
 import sys
@@ -35,6 +39,7 @@ CONTRASTS = [("23P", "5P-ET", "23P"), ("23P", "4P", "23P"),
              ("4P", "5P-ET", "4P"), ("4P", "5P-IT", "4P"), ("4P", "23P", "4P")]
 BIN_UM = 50
 MAX_DIST_UM = 3.0
+MIN_STRATA = 3
 
 
 def tables(pairs, conn, pre_ct, a, b, strat="soma_dist"):
@@ -65,8 +70,22 @@ def log_or(g, w=None):
     raw = np.log((a.sum() * d_.sum()) / (b_.sum() * c.sum()))
     tot = n_a + n_b
     ok = tot > 0
-    mh = np.log((a * d_ / tot)[ok].sum() / (b_ * c / tot)[ok].sum())
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mh = np.log((a * d_ / tot)[ok].sum() / (b_ * c / tot)[ok].sum())
     return raw, mh
+
+
+def n_informative(g):
+    """Strata contributing to the MH numerator and to the denominator (complete-state estimability check)."""
+    s = g.groupby(["isA", "bin"])[["c", "n"]].sum().unstack("isA").fillna(0)
+    a, n_a, c, n_b = s[("c", True)], s[("n", True)], s[("c", False)], s[("n", False)]
+    return int((a * (n_b - c) > 0).sum()), int(((n_a - a) * c > 0).sum())
+
+
+def ci(x):
+    """95% interval over finite bootstrap values; share of undefined samples."""
+    f = x[np.isfinite(x)]
+    return np.quantile(f, [.025, .975]), 1 - len(f) / len(x)
 
 
 def main():
@@ -109,6 +128,22 @@ def main():
     a_now = att.reindex(syn["synapse_id"]).fillna(False).to_numpy(bool)
     groups = syn.groupby("pre_root_id").indices
     k = {r: int(a_now[ix].sum()) for r, ix in groups.items()}
+    # synapse attachment by depth relative to the presynaptic soma (V1->V1 synapses of the complete axons)
+    v1_syn = v1[s_row]
+    dy = syn["ctr_y_nm"].to_numpy() / 1000 - ni.loc[syn["pre_root_id"], "soma_y_um"].to_numpy()
+    ct = ni.loc[syn["pre_root_id"], "cell_type"].to_numpy()
+    band_lab = ["> 150 above", "75-150 above", "25-75 above", "within 25", "25-75 below", "75-150 below", "> 150 below"]
+    band = pd.cut(dy, [-np.inf, -150, -75, -25, 25, 75, 150, np.inf], labels=band_lab)
+    att_by = {lab: pd.read_parquet(DATA / "history" / f"attached_{v}.parquet").set_index("synapse_id")["attached"]
+              .reindex(syn["synapse_id"]).fillna(False).to_numpy(bool) for lab, v in STATES.items() if v is not None}
+    depth_rows = []
+    for pre_ct in ("4P", "23P"):
+        for bl in band_lab:
+            msk = v1_syn & (ct == pre_ct) & (band == bl)
+            depth_rows.append({"presynaptic": pre_ct, "synapse depth vs. presynaptic soma (um)": bl,
+                               "synapses (complete)": int(msk.sum()),
+                               **{f"attached {lab}": f"{att_by[lab][msk].mean():.2f}" for lab in att_by}})
+
     rand = []
     for _ in range(args.reps):
         keep = np.zeros(len(syn), bool)
@@ -119,7 +154,7 @@ def main():
     pres = pairs["pre_root_id"].unique()
     boots = [pd.Series(np.bincount(rng.integers(0, len(pres), len(pres)), minlength=len(pres)), index=pres)
              for _ in range(args.boot)]
-    rows = []
+    rows, num = [], []
     for pre_ct, a, b in CONTRASTS:
         g = {lab: tables(pairs, n > 0, pre_ct, a, b) for lab, n in nsyn.items()}
         gd = {lab: tables(pairs, n > 0, pre_ct, a, b, "depth") for lab, n in nsyn.items()}
@@ -127,16 +162,35 @@ def main():
         bs = {lab: np.array([(*log_or(g[lab], w), log_or(gd[lab], w)[1]) for w in boots]) for lab in g}
         rr = np.array([(*log_or(tables(pairs, n > 0, pre_ct, a, b)), log_or(tables(pairs, n > 0, pre_ct, a, b, "depth"))[1])
                        for n in rand])
+        inf_strata = {1: n_informative(g["complete"]), 2: n_informative(gd["complete"])}
         for j, kind in enumerate(("raw", "distance-stratified", "depth x lateral-stratified")):
+            nn = inf_strata.get(j)
             row = {"presynaptic": pre_ct, "contrast": f"{a} vs {b}", "log OR": kind,
-                   "complete": f"{est['complete'][j]:+.2f}"}
+                   "informative strata (num, den)": "" if nn is None else f"{nn[0]}, {nn[1]}"}
+            if nn is not None and min(nn) < MIN_STRATA:
+                row["complete"] = "n/e"
+                for lab in ("Apr 2023", "Nov 2025", "Feb 2026"):
+                    row[f"{lab} shift"] = "n/e"
+                row["random loss (Nov 2025 counts) shift"] = "n/e"
+                rows.append(row)
+                continue
+            row["complete"] = f"{est['complete'][j]:+.2f}"
             for lab in ("Apr 2023", "Nov 2025", "Feb 2026"):
-                sh = bs[lab][:, j] - bs["complete"][:, j]
-                q = np.nanquantile(sh, [.025, .975])
-                row[f"{lab} shift"] = f"{est[lab][j] - est['complete'][j]:+.2f} [{q[0]:+.2f}, {q[1]:+.2f}]"
-            row["random loss (Nov 2025 counts) shift"] = (f"{rr[:, j].mean() - est['complete'][j]:+.2f} "
-                                                          f"[{np.quantile(rr[:, j], .025) - est['complete'][j]:+.2f}, "
-                                                          f"{np.quantile(rr[:, j], .975) - est['complete'][j]:+.2f}]")
+                q, und = ci(bs[lab][:, j] - bs["complete"][:, j])
+                num.append({"presynaptic": pre_ct, "contrast": f"{a} vs {b}", "kind": kind, "state": lab,
+                            "complete": est["complete"][j], "shift": est[lab][j] - est["complete"][j],
+                            "lo": q[0], "hi": q[1], "undefined_frac": und})
+                row[f"{lab} shift"] = (f"{est[lab][j] - est['complete'][j]:+.2f} [{q[0]:+.2f}, {q[1]:+.2f}]"
+                                       + (f" ({und:.0%} undef.)" if und > 0 else ""))
+            fr = rr[:, j][np.isfinite(rr[:, j])]
+            num.append({"presynaptic": pre_ct, "contrast": f"{a} vs {b}", "kind": kind, "state": "random loss (Nov 2025 counts)",
+                        "complete": est["complete"][j], "shift": fr.mean() - est["complete"][j],
+                        "lo": np.quantile(fr, .025) - est["complete"][j], "hi": np.quantile(fr, .975) - est["complete"][j],
+                        "undefined_frac": 1 - len(fr) / len(rr)})
+            row["random loss (Nov 2025 counts) shift"] = (f"{fr.mean() - est['complete'][j]:+.2f} "
+                                                          f"[{np.quantile(fr, .025) - est['complete'][j]:+.2f}, "
+                                                          f"{np.quantile(fr, .975) - est['complete'][j]:+.2f}]"
+                                                          + (f" ({1 - len(fr) / len(rr):.0%} undef.)" if len(fr) < len(rr) else ""))
             rows.append(row)
         print(*rows[-3:], sep="\n", flush=True)
 
@@ -149,15 +203,25 @@ def main():
             kept.append({"presynaptic": pre_ct, "target": post_ct, "connections (complete)": int(full),
                          **{f"kept {lab}": f"{(nsyn[lab][m] > 0).sum() / full:.2f}" for lab in ("Apr 2023", "Nov 2025", "Feb 2026")},
                          "median soma distance (um)": int(pairs.loc[m & (nsyn["complete"] > 0), "soma_dist_um"].median())})
-    t, kt = pd.DataFrame(rows), pd.DataFrame(kept)
+    t, kt, dt = pd.DataFrame(rows), pd.DataFrame(kept), pd.DataFrame(depth_rows)
+    out = DATA / "celltype_history"
+    out.mkdir(exist_ok=True)
+    pd.DataFrame(num).to_csv(out / f"shifts_v{VERSION}.csv", index=False)
+    dt.to_csv(out / f"attachment_by_depth_v{VERSION}.csv", index=False)
     (ROOT / "notebooks" / "14_celltype_connectivity.md").write_text(
         f"# Session 14: cell-type connection preference across the proofreading history (auto-generated, v{VERSION})\n\n"
         "V1->V1 candidate pairs of the 193 complete axons. log OR = log odds of connecting to a target of type A "
         "rather than B; distance-stratified = Mantel-Haenszel over 50 um soma-distance bins; depth x lateral-stratified = "
         "Mantel-Haenszel over 50 um bins of the target's signed depth relative to the presynaptic soma x 50 um lateral bins. Shift = state minus "
         f"complete [95% paired bootstrap over presynaptic axons, {args.boot} samples]. Random loss = each axon keeps a "
-        f"random subset of its synapses of its Nov 2025 size ({args.reps} reps; mean [2.5%, 97.5%]).\n\n"
+        f"random subset of its synapses of its Nov 2025 size ({args.reps} reps; mean [2.5%, 97.5%]). "
+        f"n/e = not estimable: fewer than {MIN_STRATA} strata contribute to the Mantel-Haenszel numerator or "
+        "denominator in the complete state (the two target types barely overlap in space). "
+        "Informative strata (num, den) = strata with A connected & B unconnected, and A unconnected & B connected.\n\n"
         "## Fraction of complete-state connections present, by target type\n\n" + kt.to_markdown(index=False) +
+        "\n\n## Synapse attachment by depth relative to the presynaptic soma (V1->V1)\n\n"
+        "Depth = synapse y minus presynaptic soma y (y increases with cortical depth). Fraction of the complete axons' "
+        "V1->V1 synapses attached to the soma at each state.\n\n" + dt.to_markdown(index=False) +
         "\n\n## Target-type preference (log odds ratio)\n\n" + t.to_markdown(index=False) + "\n")
     print(kt.to_string(index=False))
 

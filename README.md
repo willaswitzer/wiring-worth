@@ -14,7 +14,13 @@ datastack `minnie65_public`, materialization **v1822** (pinned in `config.py`), 
 - The RF inflation is spatial sampling. A shuffled-wiring control that keeps each axon's target-distance
   distribution removes it: the preference beyond distance is the same in partial and complete states.
 - Radial truncation of complete axons reproduces the RF inflation; random cable loss of the same amount does not.
-- Orientation like-to-like beyond distance is carried by 4P axons; 23P axons show none.
+- The orientation rule looked weaker because the 4P axons that carry it were the least complete: random loss of
+  each axon's synapses down to its historical count reproduces the weakening exactly.
+- Orientation like-to-like beyond distance is carried by 4P axons; 23P→23P shows none, matching Ding et al. (2025)
+  for L2/3. This holds on the newest release (v1926), which nearly doubles the 23P→23P synapses.
+- A second, structural rule is biased too: partial 4P axons lacked their ascending branches, which erased their
+  preference for 23P over 4P targets. A distance-matched comparison does not correct this; the null has to match
+  the geometry of the missing cable.
 
 ## Figures
 
@@ -22,10 +28,11 @@ datastack `minnie65_public`, materialization **v1822** (pinned in `config.py`), 
 |---|---|---|
 | Fig. 1 `figures/08_history.pdf` | `scripts/figure_history.py` | `data/history/`, `data/truncation/trunc_*_hist*.csv`, `trunc_perm_*` |
 | Fig. 2 `figures/07_truncation_shift.pdf` | `scripts/figure_truncation_shift.py` | `data/truncation/trunc_{slopes,boot,perm}_poisson*.csv` |
+| Fig. S1 `figures/14_celltype_history.pdf` | `scripts/figure_celltype_history.py` | `data/celltype_history/` |
 | Baseline `figures/06_like_to_like.png` | `scripts/summarize_like_to_like.py` | `data/like_to_like/` |
 
 Results notes for each session are in `notebooks/NN_results.md`; the preprint's numbers come from
-`notebooks/06`–`10`.
+`notebooks/06`–`15` (supplementary tables S1–S14 map to these files as listed in the preprint).
 
 ## Reproducing
 
@@ -54,7 +61,12 @@ from its output CSV.
 | 6 | `scripts/edit_history.py fetch` / `build`, `run_edit_history.sh`, `run_history_ci.sh`, `run_distance_null.sh` | real proofreading history, distance-matched shuffle |
 | 7 | `scripts/run_distance_sensitivity.sh` | bin width, within cell type |
 | 8 | `scripts/run_session10.sh` | Feb 2026 state, shuffle top-ups, match-rule sensitivity, Ld models |
-| 9 | `scripts/figure_history.py`, `scripts/figure_truncation_shift.py` | figures |
+| 9 | `scripts/run_session11.sh` | column-cylinder and path-radius truncation; v1926 status of the 193 axons |
+| 10 | `scripts/run_session12.sh` | missing vs. attached synapses, count-matched random loss, postsynaptic rollback |
+| 11 | `scripts/run_session13.sh` | like-to-like by presynaptic × postsynaptic cell type |
+| 12 | `.venv/bin/python scripts/celltype_connectivity_history.py` | target-type preference across the history (Table S13) |
+| 13 | `scripts/run_v1926.sh` (sets `MICRONS_VERSION=1926` itself) | complete-axon results on v1926 (Table S14) |
+| 14 | `scripts/figure_history.py`, `scripts/figure_truncation_shift.py`, `scripts/figure_celltype_history.py` | figures |
 
 Runtimes on an 8 GB Mac are given at the top of each `run_*.sh`.
 
